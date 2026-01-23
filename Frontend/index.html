@@ -24,9 +24,7 @@
         <ul>
             <li class="active" onclick="changePage('utama', this)">Dashboard Utama</li>
             <li onclick="window.location.href='distribusi_puskesmas.html'">Distribusi Puskesmas</li>
-            <li onclick="changePage('trend', this)">Trend Keracunan</li>
-            <li onclick="changePage('data', this)">Data Kasus</li>
-            <li onclick="changePage('setting', this)">Pengaturan</li>
+            <li onclick="changePage('data', this)">Tabel</li>
         </ul>
     </aside>
 
@@ -159,13 +157,13 @@
                     </div>
 
                     <div class="card chart">
-                        <h4>Attack Rate dan Jumlah Kejadian</h4>
+                        <h4>Perbandingan antara BIAS dan UCI</h4>
                         <canvas id="scatterChart"></canvas>
                     </div>
 
                     <div class="row">
                         <div class="card chart">
-                            <h4>Distribusi Kategori Usia</h4>
+                            <h4>Distribusi berdasarkan Kelas</h4>
                             <canvas id="usiaChart"></canvas>
                         </div>
 
