@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Imunisasi Wilayah Sleman</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Chart.js (WAJIB JANGAN DIHAPUS) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3>📊 DAMPALIN</h3>
+            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+        </div>
+
+        <ul>
+            <li class="active" onclick="changePage('utama', this)">Dashboard Utama</li>
+            <li onclick="window.location.href='distribusi_puskesmas.html'">Distribusi Puskesmas</li>
+            <li onclick="changePage('trend', this)">Trend Keracunan</li>
+            <li onclick="changePage('data', this)">Data Kasus</li>
+            <li onclick="changePage('setting', this)">Pengaturan</li>
+        </ul>
+    </aside>
+
+    <!-- ================= MAIN ================= -->
+    <main class="main">
+
+        <!-- HEADER -->
+        <header class="header">
+            <h2>
+                DASHBOARD PEMANTAUAN DAN ANALISIS<br>
+                LAPORAN KEGIATAN IMUNISASI DI KAB. SLEMAN
+            </h2>
+
+            <div class="filter">
+                <select><option>Tahun</option></select>
+                <select><option>Puskesmas</option></select>
+                <select><option>Kategori</option></select>
+            </div>
+        </header>
+
+        <!-- ================= DASHBOARD UTAMA ================= -->
+        <section id="utama" class="page active">
+            <div class="content">
+
+                <!-- LEFT CONTENT -->
+                <div class="left">
+
+                    <div class="summary-grid">
+                        <div class="card green">
+                            <h4>Total Semua Imunisasi (Sudah)</h4>
+                            <h1>30</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Semua Imunisasi (Tidak)</h4>
+                            <h1>30</h1>
+                        </div>
+                        <div class="card green">
+                            <h4>Total Imunisasi Campak (Sudah)</h4>
+                            <h1>3.854</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi Campak (Tidak)</h4>
+                            <h1>3.854</h1>
+                        </div>
+                        <div class="card green">
+                            <h4>Total Imunisasi DT (Sudah)</h4>
+                            <h1>0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi DT (Tidak)</h4>
+                            <h1>0</h1>
+                        </div>
+                        <div class="card green">
+                            <h4>Total Imunisasi TD (Sudah)</h4>
+                            <h1>0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi TD (Tidak)</h4>
+                            <h1>0</h1>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="card cyan">
+                            <h4>Kelas 1 (Campak)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
+
+                        <div class="card cyan">
+                            <h4>Kelas 1 (DT)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
+
+                        <div class="card cyan">
+                            <h4>Kelas 1 (TD)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
+                        <div class="card cyan">
+                            <h4>Kelas 2 (TD)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
+
+                        <div class="card cyan">
+                            <h4>Kelas 5 (TD)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
+
+                        <div class="card cyan">
+                            <h4>Kelas 5 (HPV)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
+
+                        <div class="card cyan">
+                            <h4>Kelas 9 (HPV)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
+
+                    </div>
+
+                    <div class="row">
+                        <div class="card pink">
+                            <h4>Total pelajar dan bayi lahir (%)</h4>
+                            <h1>51,47</h1>
+                        </div>
+                        <div class="card orange">
+                            <h4>Total pelajar dan bayi lahir</h4>
+                            <h1>13.419</h1>
+                        </div>
+                    </div>
+
+                    <div class="card chart">
+                        <h4>Attack Rate dan Jumlah Kejadian</h4>
+                        <canvas id="scatterChart"></canvas>
+                    </div>
+
+                    <div class="row">
+                        <div class="card chart">
+                            <h4>Distribusi Kategori Usia</h4>
+                            <canvas id="usiaChart"></canvas>
+                        </div>
+
+                        <div class="card chart">
+                            <h4>Distribusi Jenis Kelamin</h4>
+                            <canvas id="jkChart"></canvas>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT CONTENT -->
+                <div class="right">
+                    <div class="card chart">
+                        <h4>Distribusi Berdasarkan Puskesmas</h4>
+                        <canvas id="barChart"></canvas>
+                    </div>
+
+                    <div class="card chart">
+                        <h4>Trend Keracunan Pangan</h4>
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================= HALAMAN LAIN ================= -->
+        <section id="trend" class="page">
+            <div class="card chart">
+                <h4>Trend Keracunan Pangan</h4>
+                <canvas id="trendChart2"></canvas>
+            </div>
+        </section>
+
+        <section id="data" class="page">
+            <div class="card">
+                <h4>Data Kasus</h4>
+                <p>🔜 Tabel Data (MySQL / API)</p>
+            </div>
+        </section>
+
+        <section id="setting" class="page">
+            <div class="card">
+                <h4>Pengaturan</h4>
+                <p>🔧 Konfigurasi Dashboard</p>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

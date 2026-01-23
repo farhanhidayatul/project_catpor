@@ -1,0 +1,227 @@
+/* ================= RESET ================= */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+body {
+    background: #f4f6f9;
+    color: #1f2937;
+}
+
+/* ================= APP LAYOUT ================= */
+.app {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    min-height: 100vh;
+}
+
+/* ================= SIDEBAR ================= */
+.sidebar {
+    width: 240px;
+    background: #1e293b;
+    color: #ffffff;
+    padding: 16px;
+    position: relative;
+    transition: width 0.3s ease;
+}
+
+.sidebar.collapsed {
+    width: 64px;
+}
+
+/* Sidebar Header */
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.sidebar-header h3 {
+    font-size: 18px;
+    white-space: nowrap;
+}
+
+/* Toggle Button */
+.toggle-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+/* Sidebar Menu */
+.sidebar ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar li {
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.sidebar li:hover,
+.sidebar li.active {
+    background: #2563eb;
+}
+
+/* Collapse behavior */
+.sidebar.collapsed h3,
+.sidebar.collapsed ul {
+    display: none;
+}
+
+/* ================= MAIN ================= */
+.main {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+}
+
+/* ================= HEADER ================= */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+.header h2 {
+    font-size: 18px;
+    line-height: 1.4;
+}
+
+/* Filter */
+.filter {
+    display: flex;
+    gap: 8px;
+}
+
+.filter select {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+}
+
+/* ================= PAGE ================= */
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+/* ================= CONTENT GRID ================= */
+.content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+/* ================= LEFT & RIGHT ================= */
+.left,
+.right {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ================= CARD ================= */
+.card {
+    background: #ffffff;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.card h4 {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.card h1 {
+    font-size: 28px;
+    font-weight: 700;
+}
+
+/* ================= COLOR VARIANTS ================= */
+.card.green { background: #dcfce7; }
+.card.red { background: #fee2e2; }
+.card.cyan { background: #cffafe; }
+.card.orange { background: #ffedd5; }
+.card.pink { background: #fce7f3; }
+
+/* ================= ROW CARDS ================= */
+.row,
+.row-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+/* ================= SUMMARY GRID ================= */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+
+/* ================= CHART CARD ================= */
+.card.chart {
+    height: 320px;
+}
+
+.card.chart canvas {
+    width: 100% !important;
+    height: 240px !important;
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 1024px) {
+    .content {
+        grid-template-columns: 1fr;
+    }
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+}
+
+@media (max-width: 768px) {
+    .app {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        width: 100%;
+    }
+
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .filter {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+}
