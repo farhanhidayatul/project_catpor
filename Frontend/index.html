@@ -39,9 +39,24 @@
             </h2>
 
             <div class="filter">
-                <select><option>Tahun</option></select>
-                <select><option>Puskesmas</option></select>
-                <select><option>Kategori</option></select>
+                <select id="yearSelector" onchange="handleFilterChange()">
+                    <option value="all">Semua Tahun</option>
+                    <option value="2025">2025</option>
+                    <option value="2024">2024</option>
+                    <option value="2023">2023</option>
+                    <option value="2022">2022</option>
+                    <option value="2017">2017</option>
+                </select>
+
+                <select id="puskesmasSelector" onchange="handleFilterChange()">
+                     <option value="all">Semua Puskesmas</option>
+                </select>
+                
+                <select id="kategoriSelector" onchange="handleCategoryChange()">
+                    <option value="semua">Semua Kategori</option>
+                    <option value="bias">Kategori BIAS</option>
+                    <option value="uci">Kategori UCI</option>
+                </select>
             </div>
         </header>
 
@@ -55,36 +70,89 @@
                     <div class="summary-grid">
                         <div class="card green">
                             <h4>Total Semua Imunisasi (Sudah)</h4>
-                            <h1>30</h1>
+                            <h1 id="total-semua-s">0</h1>
                         </div>
                         <div class="card red">
                             <h4>Total Semua Imunisasi (Tidak)</h4>
-                            <h1>30</h1>
+                            <h1 id="total-semua-t">0</h1>
                         </div>
                         <div class="card green">
                             <h4>Total Imunisasi Campak (Sudah)</h4>
-                            <h1>3.854</h1>
+                            <h1 id="total-campak-s">0</h1>
                         </div>
                         <div class="card red">
                             <h4>Total Imunisasi Campak (Tidak)</h4>
-                            <h1>3.854</h1>
+                            <h1 id="total-campak-t">0</h1>
                         </div>
                         <div class="card green">
                             <h4>Total Imunisasi DT (Sudah)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-dt-s">0</h1>
                         </div>
                         <div class="card red">
                             <h4>Total Imunisasi DT (Tidak)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-dt-t">0</h1>
                         </div>
+
                         <div class="card green">
                             <h4>Total Imunisasi TD (Sudah)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-td-s">0</h1>
                         </div>
                         <div class="card red">
                             <h4>Total Imunisasi TD (Tidak)</h4>
+                            <h1 id="total-td-t">0</h1>
+                        </div>
+
+                        <div class="card green">
+                            <h4>Total Imunisasi HPV (Sudah)</h4>
+                            <h1 id="total-hpv-s">0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi HPV (Tidak)</h4>
+                            <h1 id="total-hpv-t">0</h1>
+                        </div>
+
+                        <div class="card green">
+                            <h4>Total Imunisasi RV (Sudah)</h4>
+                            <h1 id="total-rv-s">0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi RV (Tidak)</h4>
+                            <h1 id="total-rv-t">0</h1>
+                        </div>
+
+                        <div class="card green">
+                            <h4>Total Imunisasi HEKSAVALEN (Sudah)</h4>
+                            <h1 id="total-heksa-s">0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi HEKSAVALEN (Tidak)</h4>
+                            <h1 id="total-heksa-t">0</h1>
+                        </div>
+                        <div class="card green">
+                            <h4>Total Imunisasi BOOSTER (Sudah)</h4>
                             <h1>0</h1>
                         </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi BOOSTER (Tidak)</h4>
+                            <h1>0</h1>
+                        </div>
+                        <div class="card green">
+                            <h4>Total Imunisasi HB0 BCG (Sudah)</h4>
+                            <h1>0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi HB0 BCG (Tidak)</h4>
+                            <h1>0</h1>
+                        </div>
+                        <div class="card green">
+                            <h4>Total Imunisasi TT (Sudah)</h4>
+                            <h1>0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi TT (Tidak)</h4>
+                            <h1>0</h1>
+                        </div>
+
                     </div>
 
                     <div class="row">
@@ -111,6 +179,15 @@
                             <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
                             <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
                         </div>
+
+                        <div class="card cyan">
+                            <h4>Kelas 2 (DT)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
+
                         <div class="card cyan">
                             <h4>Kelas 2 (TD)</h4>
                             <p>Sudah Imunisasi: 17</p>
@@ -136,13 +213,20 @@
                         </div>
 
                         <div class="card cyan">
-                            <h4>Kelas 9 (HPV)</h4>
+                            <h4>Kelas 6 (HPV)</h4>
                             <p>Sudah Imunisasi: 17</p>
                             <p>Tidak Imunisasi: 1.266</p>
                             <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
                             <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
                         </div>
 
+                         <div class="card cyan">
+                            <h4>Kelas 9 (HPV)</h4>
+                            <p>Sudah Imunisasi: 17</p>
+                            <p>Tidak Imunisasi: 1.266</p>
+                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
+                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                        </div>
                     </div>
 
                     <div class="row">
