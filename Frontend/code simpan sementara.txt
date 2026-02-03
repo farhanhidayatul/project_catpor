@@ -1,0 +1,234 @@
+let cachedData = null;
+
+// Konfigurasi kolom "Tidak" berdasarkan kategori
+const TIDAK_RULES = {
+    campak: ['ttl_abs_cmk'],
+    dt:     ['ttl_abs_dt'],
+    td:     ['ttl_abs_td', 'ttl_abs_td_kls_2', 'ttl_abs_td_kls_5'],
+    hpv:    ['hpv_ttl_abs_kls_5', 'hpv_ttl_abs_kls_6', 'hpv_ttl_abs_kls_9'],
+    rv:      ['mati_-_L', 'mati_-_P', 'pindah_-_L', 'pindah_-_P', 'menolak_L', 'menolak_P'],
+    rotarix: ['mati_-_L', 'mati_-_P', 'pindah_-_L', 'pindah_-_P', 'menolak_L', 'menolak_P'],
+    pcv:     ['mati_-_L', 'mati_-_P', 'pindah_-_L', 'pindah_-_P', 'menolak_L', 'menolak_P'],
+    je:      ['mati_-_L', 'mati_-_P', 'pindah_-_L', 'pindah_-_P', 'menolak_L', 'menolak_P'],
+    heksa:   ['mati_-_L', 'mati_-_P', 'pindah_-_L', 'pindah_-_P', 'menolak_L', 'menolak_P']
+};
+
+// Pemetaan sumber data BIAS (Contoh: TD mengambil dari data 'dt' dan 'td')
+const BIAS_SOURCE_MAP = {
+    campak: ['campak'],
+    dt:     ['dt'],
+    td:     ['dt', 'td'], 
+    hpv:    ['hpv']
+};
+
+// ==================================================
+// CORE CALCULATORS (Dinamis Berdasarkan Rules)
+// ==================================================
+
+/**
+ * Menjumlahkan kolom 'Sudah' dari beberapa sumber data sekaligus
+ * @param {Object} biasObj - Data BIAS yang sudah difilter
+ * @param {String} category - Nama kategori (campak/dt/td/hpv)
+ * @param {String|Array} keys - Nama property/kolom yang dijumlahkan
+ */
+function calculateSudahBIAS(biasObj, category, keys) {
+    const sources = BIAS_SOURCE_MAP[category] || [];
+    const keyList = Array.isArray(keys) ? keys : [keys];
+    let total = 0;
+
+    sources.forEach(src => {
+        const dataNode = biasObj[src]; // Contoh: biasObj['hpv']
+        if (!dataNode) return;
+
+        // CEK HIERARKI: Jika ada properti 'kelas'
+        if (dataNode.kelas) {
+            // Iterasi setiap kelas (kelas_5, kelas_6, dsb)
+            Object.keys(dataNode.kelas).forEach(klsKey => {
+                const rows = dataNode.kelas[klsKey]; // Ini adalah Array data per kelas
+                if (Array.isArray(rows)) {
+                    rows.forEach(row => {
+                        keyList.forEach(k => { total += (Number(row[k]) || 0); });
+                    });
+                }
+            });
+        } 
+        // Jika struktur flat (seperti campak/dt biasa)
+        else if (Array.isArray(dataNode)) {
+            dataNode.forEach(row => {
+                keyList.forEach(k => { total += (Number(row[k]) || 0); });
+            });
+        }
+    });
+    return total;
+}
+
+/**
+ * Menjumlahkan kolom 'Tidak' berdasarkan TIDAK_RULES
+ * @param {Array|Object} data - Array data langsung atau Object sumber BIAS
+ * @param {String} category - Key di TIDAK_RULES
+ */
+function calculateTidak(data, category) {
+    const rules = TIDAK_RULES[category] || [];
+    let total = 0;
+
+    const processArray = (arr) => {
+        arr.forEach(row => {
+            rules.forEach(ruleKey => { total += (Number(row[ruleKey]) || 0); });
+        });
+    };
+
+    // Jika kategori memiliki hierarki 'kelas'
+    if (data && data.kelas) {
+        Object.keys(data.kelas).forEach(klsKey => {
+            if (Array.isArray(data.kelas[klsKey])) {
+                processArray(data.kelas[klsKey]);
+            }
+        });
+    } 
+    // Jika data adalah Array (seperti UCI atau BIAS flat)
+    else if (Array.isArray(data)) {
+        processArray(data);
+    }
+    return total;
+}
+
+// ==================================================
+// PROCESSORS
+// ==================================================
+
+function processDataBIAS(bias) {
+    const hasil = {
+        campak: {
+            s: calculateSudahBIAS(bias, 'campak', 'imun_cmk_jml'),
+            t: calculateTidak(bias.campak, 'campak')
+        },
+        dt: {
+            s: calculateSudahBIAS(bias, 'dt', 'dt_imun_jml'),
+            t: calculateTidak(bias.dt, 'dt')
+        },
+        td: {
+            // TD tetap mengambil dari dt dan td sesuai BIAS_SOURCE_MAP
+            s: calculateSudahBIAS(bias, 'td', ['td_imun_jml_kls_2', 'imun_td_jml_kls_5']),
+            t: calculateTidak(bias.td, 'td')
+        },
+        hpv: {
+            // Otomatis menyisir hpv -> kelas -> [semua kelas]
+            s: calculateSudahBIAS(bias, 'hpv', [
+                'imun_hpv_jml_kls_5', 
+                'imun_hpv_jml_kls_6', 
+                'imun_hpv_jml_kls_9'
+            ]),
+            t: calculateTidak(bias.hpv, 'hpv')
+        }
+    };
+
+    // Update UI
+    Object.keys(hasil).forEach(k => updateCard(k, hasil[k].s, hasil[k].t));
+
+    return {
+        total_s: Object.values(hasil).reduce((acc, curr) => acc + curr.s, 0),
+        total_t: Object.values(hasil).reduce((acc, curr) => acc + curr.t, 0)
+    };
+}
+
+function processDataUCI(uci) {
+    const data = uci.antigen || [];
+    
+    // Helper internal untuk menjumlahkan kolom 'Sudah' di UCI
+    const sumS = (keys) => {
+        const keyList = Array.isArray(keys) ? keys : [keys];
+        return data.reduce((acc, row) => {
+            let rowSum = 0;
+            keyList.forEach(k => rowSum += (Number(row[k]) || 0));
+            return acc + rowSum;
+        }, 0);
+    };
+
+    const hasil = {
+        rv:      { s: sumS(['rv_1_jml', 'rv_2_jml', 'rv_3_jml']), t: calculateTidak(data, 'rv') },
+        rotarix: { s: sumS(['rotarix_1_jml', 'rotarix_2_jml']),    t: calculateTidak(data, 'rotarix') },
+        pcv:     { s: sumS(['pcv_1_jml', 'pcv_2_jml', 'pcv_3_jml']), t: calculateTidak(data, 'pcv') },
+        je:      { s: sumS('je_jml'),                                t: calculateTidak(data, 'je') },
+        heksa:   { s: sumS(['heksavalen_1_jml', 'heksavalen_2_jml', 'heksavalen_3_jml']), t: calculateTidak(data, 'heksa') }
+    };
+
+    return hasil;
+}
+
+// ==================================================
+// MAIN FILTER HANDLER
+// ==================================================
+function handleFilterChange() {
+    if (!cachedData) return;
+
+    const selectedPuskesmas = document.getElementById('puskesmasSelector').value;
+    const selectedYear = document.getElementById('yearSelector').value;
+
+    // Filter Logic
+    const universalFilter = (arr, useYear = false) => {
+        if (!Array.isArray(arr)) return [];
+        return arr.filter(d => {
+            const matchPusk = selectedPuskesmas === 'all' || d.Pukesmas === selectedPuskesmas;
+            const matchYear = !useYear || selectedYear === 'all' || String(d.tahun) === selectedYear;
+            return matchPusk && matchYear;
+        });
+    };
+
+    // Prepare Filtered Data
+    let filteredBias = {};
+    Object.keys(cachedData.program_imunisasi.bias).forEach(key => {
+        filteredBias[key] = universalFilter(cachedData.program_imunisasi.bias[key], false);
+    });
+
+    let filteredUci = {
+        antigen: universalFilter(cachedData.program_imunisasi.uci.antigen, true)
+    };
+
+    // Execution
+    const biasRes = processDataBIAS(filteredBias);
+    const uciRes  = processDataUCI(filteredUci);
+
+    // Render UCI Individual Cards
+    Object.keys(uciRes).forEach(k => updateCard(k, uciRes[k].s, uciRes[k].t));
+
+    // Calculate Grand Totals
+    const uciTotalS = Object.values(uciRes).reduce((a, b) => a + b.s, 0);
+    const uciTotalT = Object.values(uciRes).reduce((a, b) => a + b.t, 0);
+
+    updateText('total-semua-s', biasRes.total_s + uciTotalS);
+    updateText('total-semua-t', biasRes.total_t + uciTotalT);
+}
+
+// ==================================================
+// DATA FETCH & INITIALIZATION
+// ==================================================
+async function fetchImunisasiData() {
+    try {
+        const response = await fetch('data_imunisasi_terbaru.json');
+        cachedData = await response.json();
+        populatePuskesmasFilter();
+        handleFilterChange();
+    } catch (e) { console.error("Data Load Error:", e); }
+}
+
+function updateText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = (Number(value) || 0).toLocaleString('id-ID');
+}
+
+function updateCard(prefix, s, t) {
+    updateText(`total-${prefix}-s`, s);
+    updateText(`total-${prefix}-t`, t);
+}
+
+function populatePuskesmasFilter() {
+    const selector = document.getElementById('puskesmasSelector');
+    if (!selector || !cachedData) return;
+    const puskList = [...new Set(cachedData.program_imunisasi.bias.campak.map(d => d.Pukesmas))];
+    puskList.sort().forEach(p => {
+        const opt = new Option(p, p);
+        selector.add(opt);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', fetchImunisasiData);

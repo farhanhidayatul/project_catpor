@@ -1,219 +1,114 @@
 // ==================================================
-// GLOBAL CACHE
+// 1. GLOBAL CACHE
 // ==================================================
 let cachedData = null;
 
 // ==================================================
-// FETCH DATA
+// 2. DATA FETCH & INITIALIZATION
 // ==================================================
 async function fetchImunisasiData() {
     try {
         const response = await fetch('data_imunisasi_terbaru.json');
-        if (!response.ok) throw new Error("Gagal mengambil file JSON");
-
         cachedData = await response.json();
-
         populatePuskesmasFilter();
         handleFilterChange();
     } catch (error) {
-        console.error("Error memuat data:", error);
+        console.error("Gagal memuat data:", error);
     }
 }
 
 // ==================================================
-// FILTER HANDLER (BIAS ≠ UCI)
+// 3. FILTER HANDLER (PENJABARAN EKSPLISIT)
 // ==================================================
 function handleFilterChange() {
     if (!cachedData) return;
 
     const selectedPuskesmas = document.getElementById('puskesmasSelector').value;
-    const selectedYear = document.getElementById('yearSelector').value;
-
     const biasSource = cachedData.program_imunisasi.bias;
-    const uciSource  = cachedData.program_imunisasi.uci;
 
-    // -----------------------------
-    // FILTER BIAS (TANPA TAHUN)
-    // -----------------------------
-    const filterBias = (arr) => {
-        if (!Array.isArray(arr)) return [];
-        return arr.filter(d =>
-            selectedPuskesmas === 'all' || d.Pukesmas === selectedPuskesmas
-        );
-    };
-
-    let filteredBias = {};
-    Object.keys(biasSource).forEach(key => {
-        filteredBias[key] = filterBias(biasSource[key]);
+    // Helper Filter Dasar
+    const filterArray = (arr) => (arr || []).filter(d => {
+        const pusk = d.Pukesmas || d.Puskesmas;
+        return selectedPuskesmas === 'all' || pusk === selectedPuskesmas;
     });
 
-    // -----------------------------
-    // FILTER UCI (DENGAN TAHUN)
-    // -----------------------------
-    const filterUci = (arr) => {
-        if (!Array.isArray(arr)) return [];
-        return arr.filter(d => {
-            const byPuskesmas =
-                selectedPuskesmas === 'all' || d.Pukesmas === selectedPuskesmas;
-
-            const byYear =
-                selectedYear === 'all' || String(d.tahun) === selectedYear;
-
-            return byPuskesmas && byYear;
-        });
+    // --- PROSES FILTER SATU PER SATU ---
+    let filteredBias = {
+        campak: filterArray(biasSource.campak),
+        dt:     filterArray(biasSource.dt),
+        td:     filterArray(biasSource.td),
+        // Jabarkan struktur HPV secara manual sesuai 3 kelas
+        hpv: {
+            kelas: {
+                kelas_5: filterArray(biasSource.hpv?.kelas_5),
+                kelas_6: filterArray(biasSource.hpv?.kelas_6),
+                kelas_9: filterArray(biasSource.hpv?.kelas_9)
+            }
+        }
     };
 
-    let filteredUci = {
-        antigen: filterUci(uciSource.antigen),
-        hb0_BCG: filterUci(uciSource.hb0_BCG),
-        tt: filterUci(uciSource.tt)
-    };
-
-    // ==================================================
-    // PROCESS DATA
-    // ==================================================
-    const totalBIAS = processDataBIAS(filteredBias);
-    const hasilUCI  = processDataUCI(filteredUci);
-
-    renderUCItoUI(hasilUCI);
-
-    // ==================================================
-    // TOTAL SEMUA (BIAS + UCI)
-    // ==================================================
-    const totalSudahSemua =
-        totalBIAS.total_s +
-        hasilUCI.rv.s +
-        hasilUCI.rotarix.s +
-        hasilUCI.pcv.s +
-        hasilUCI.je.s +
-        hasilUCI.heksa.s;
-
-    const totalTidakSemua =
-        totalBIAS.total_t +
-        hasilUCI.rv.t +
-        hasilUCI.rotarix.t +
-        hasilUCI.pcv.t +
-        hasilUCI.je.t +
-        hasilUCI.heksa.t;
-
-    updateText('total-semua-s', totalSudahSemua);
-    updateText('total-semua-t', totalTidakSemua);
+    processDataBIAS(filteredBias);
 }
 
 // ==================================================
-// PROCESS BIAS
+// 4. PROCESSOR BIAS (PENJABARAN FORMULA HPV)
 // ==================================================
 function processDataBIAS(bias) {
-    const sum = (arr, key) =>
-        (arr || []).reduce((a, b) => a + (Number(b[key]) || 0), 0);
+    
+    // --- 1. HITUNG CAMPAK ---
+    const campak_s = bias.campak.reduce((a, b) => a + (Number(b.imun_cmk_jml) || 0), 0);
+    const campak_t = bias.campak.reduce((a, b) => a + (Number(b.ttl_abs_cmk) || 0), 0);
 
-    const sumTidak = (arr) =>
-        (arr || []).reduce((a, b) =>
-            a +
-            (Number(b.tdk_imun_skt) || 0) +
-            (Number(b.tdk_blk_agm) || 0) +
-            (Number(b.tdk_blk_alsn_ln) || 0),
-        0);
+    // --- 2. HITUNG DT ---
+    const dt_s = bias.dt.reduce((a, b) => a + (Number(b.dt_imun_jml) || 0), 0);
+    const dt_t = bias.dt.reduce((a, b) => a + (Number(b.ttl_abs_dt) || 0), 0);
 
-    const hasil = {
-        campak: {
-            s: sum(bias.campak, 'imun_cmk_jml'),
-            t: sumTidak(bias.campak)
-        },
-        dt: {
-            s: sum(bias.dt, 'dt_imun_jml'),
-            t: sumTidak(bias.dt)
-        },
-        td: {
-            s:
-                sum(bias.td, 'td_imun_jml_kls_2') +
-                sum(bias.td, 'imun_td_jml_kls_5'),
-            t: sumTidak(bias.td)
-        },
-        hpv: {
-            s: sum(bias.hpv, 'imun_hpv_jml'),
-            t: sumTidak(bias.hpv)
-        }
-    };
+    // --- 3. HITUNG TD (Gabungan tabel DT kls 1 & tabel TD kls 2,5) ---
+    const td_s = bias.dt.reduce((a, b) => a + (Number(b.imun_td_jml) || 0), 0) +
+                 bias.td.reduce((a, b) => a + (Number(b.td_imun_jml_kls_2) || 0) + (Number(b.imun_td_jml_kls_5) || 0), 0);
+    
+    const td_t = bias.dt.reduce((a, b) => a + (Number(b.ttl_abs_td) || 0), 0) +
+                 bias.td.reduce((a, b) => a + (Number(b.ttl_abs_td_kls_2) || 0) + (Number(b.ttl_abs_td_kls_5) || 0), 0);
 
-    Object.keys(hasil).forEach(k =>
-        updateCard(k, hasil[k].s, hasil[k].t)
-    );
+    // --- 4. HITUNG HPV (JABARKAN PER KELAS) ---
+    const k5 = bias.hpv.kelas.kelas_5;
+    const k6 = bias.hpv.kelas.kelas_6;
+    const k9 = bias.hpv.kelas.kelas_9;
 
-    return {
-        total_s:
-            hasil.campak.s +
-            hasil.dt.s +
-            hasil.td.s +
-            hasil.hpv.s,
-        total_t:
-            hasil.campak.t +
-            hasil.dt.t +
-            hasil.td.t +
-            hasil.hpv.t
-    };
+    // Kalkulasi "Sudah" per kelas
+    const hpv_s_k5 = k5.reduce((a, b) => a + (Number(b.hpv_ttl_kls_5) || 0), 0);
+    const hpv_s_k6 = k6.reduce((a, b) => a + (Number(b.hpv_ttl_kls_6) || 0), 0);
+    const hpv_s_k9 = k9.reduce((a, b) => a + (Number(b.hpv_ttl_kls_9) || 0), 0);
+
+    // Kalkulasi "Tidak" per kelas
+    const hpv_t_k5 = k5.reduce((a, b) => a + (Number(b.hpv_ttl_abs_kls_5) || 0), 0);
+    const hpv_t_k6 = k6.reduce((a, b) => a + (Number(b.hpv_ttl_abs_kls_6) || 0), 0);
+    const hpv_t_k9 = k9.reduce((a, b) => a + (Number(b.hpv_ttl_abs_kls_9) || 0), 0);
+
+    // Akumulasi Total HPV
+    const hpv_s = hpv_s_k5 + hpv_s_k6 + hpv_s_k9;
+    const hpv_t = hpv_t_k5 + hpv_t_k6 + hpv_t_k9;
+
+    // --- 5. UPDATE UI ---
+    updateCard('campak', campak_s, campak_t);
+    updateCard('dt',     dt_s,     dt_t);
+    updateCard('td',     td_s,     td_t);
+    updateCard('hpv',    hpv_s,    hpv_t);
+
+    // Hitung Grand Total BIAS
+    const total_s = campak_s + dt_s + td_s + hpv_s;
+    const total_t = campak_t + dt_t + td_t + hpv_t;
+
+    updateText('total-semua-s', total_s);
+    updateText('total-semua-t', total_t);
 }
 
 // ==================================================
-// PROCESS UCI
+// 5. UI HELPERS
 // ==================================================
-function processDataUCI(uci) {
-    const antigen = uci.antigen || [];
-
-    const sum = (key) =>
-        antigen.reduce((a, b) => a + (Number(b[key]) || 0), 0);
-
-    const sumTidak = () =>
-        antigen.reduce((a, b) =>
-            a +
-            (Number(b.tdk_imun_skt) || 0) +
-            (Number(b.tdk_blk_agm) || 0) +
-            (Number(b.tdk_blk_alsn_ln) || 0),
-        0);
-
-    return {
-        rv: {
-            s: sum('rv_1_jml') + sum('rv_2_jml') + sum('rv_3_jml'),
-            t: sumTidak()
-        },
-        rotarix: {
-            s: sum('rotarix_1_jml') + sum('rotarix_2_jml'),
-            t: sumTidak()
-        },
-        pcv: {
-            s: sum('pcv_1_jml') + sum('pcv_2_jml') + sum('pcv_3_jml'),
-            t: sumTidak()
-        },
-        je: {
-            s: sum('je_jml'),
-            t: sumTidak()
-        },
-        heksa: {
-            s:
-                sum('heksavalen_1_jml') +
-                sum('heksavalen_2_jml') +
-                sum('heksavalen_3_jml'),
-            t: sumTidak()
-        }
-    };
-}
-
-// ==================================================
-// RENDER
-// ==================================================
-function renderUCItoUI(data) {
-    Object.keys(data).forEach(k =>
-        updateCard(k, data[k].s, data[k].t)
-    );
-}
-
-// ==================================================
-// UI HELPERS
-// ==================================================
-function updateText(id, value) {
+function updateText(id, val) {
     const el = document.getElementById(id);
-    if (!el) return;
-    el.innerText = (Number(value) || 0).toLocaleString('id-ID');
+    if (el) el.innerText = (Number(val) || 0).toLocaleString('id-ID');
 }
 
 function updateCard(prefix, s, t) {
@@ -221,28 +116,20 @@ function updateCard(prefix, s, t) {
     updateText(`total-${prefix}-t`, t);
 }
 
-// ==================================================
-// DROPDOWN
-// ==================================================
 function populatePuskesmasFilter() {
     const selector = document.getElementById('puskesmasSelector');
     if (!selector || !cachedData) return;
+    const puskSet = new Set();
+    const bias = cachedData.program_imunisasi.bias;
 
-    const daftar = [
-        ...new Set(
-            cachedData.program_imunisasi.bias.campak.map(d => d.Pukesmas)
-        )
-    ];
+    // Ambil dari campak (Flat)
+    if (Array.isArray(bias.campak)) bias.campak.forEach(d => puskSet.add(d.Pukesmas || d.Puskesmas));
 
-    daftar.sort().forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = p;
-        selector.appendChild(opt);
+    [...puskSet].filter(Boolean).sort().forEach(p => {
+        selector.add(new Option(p, p));
     });
 }
 
-// ==================================================
 document.addEventListener('DOMContentLoaded', fetchImunisasiData);
 
 
