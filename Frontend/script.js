@@ -1,7 +1,15 @@
 // ==================================================
-// 1. GLOBAL CACHE
+// 1. GLOBAL CACHE & CHART INSTANCE
 // ==================================================
 let cachedData = null;
+let scatterChartInstance = null;
+
+// Registrasi plugin secara manual untuk memastikan ChartDataLabels terdeteksi
+if (typeof ChartDataLabels !== 'undefined') {
+    Chart.register(ChartDataLabels);
+} else {
+    console.error("Peringatan: Plugin ChartDataLabels tidak ditemukan. Pastikan script CDN sudah terpasang di HTML.");
+}
 
 // ==================================================
 // 2. DATA FETCH & INITIALIZATION
@@ -18,26 +26,24 @@ async function fetchImunisasiData() {
 }
 
 // ==================================================
-// 3. FILTER HANDLER (PENJABARAN EKSPLISIT)
+// 3. FILTER HANDLER (KONFIGURASI LENGKAP)
 // ==================================================
 function handleFilterChange() {
     if (!cachedData) return;
 
     const selectedPuskesmas = document.getElementById('puskesmasSelector').value;
     const biasSource = cachedData.program_imunisasi.bias;
+    const uciSource = cachedData.program_imunisasi.uci;
 
-    // Helper Filter Dasar
     const filterArray = (arr) => (arr || []).filter(d => {
-        const pusk = d.Pukesmas || d.Puskesmas;
+        const pusk = d.Pukesmas || d.Puskesmas || d.puskesmas;
         return selectedPuskesmas === 'all' || pusk === selectedPuskesmas;
     });
 
-    // --- PROSES FILTER SATU PER SATU ---
     let filteredBias = {
         campak: filterArray(biasSource.campak),
         dt:     filterArray(biasSource.dt),
         td:     filterArray(biasSource.td),
-        // Jabarkan struktur HPV secara manual sesuai 3 kelas
         hpv: {
             kelas: {
                 kelas_5: filterArray(biasSource.hpv?.kelas_5),
@@ -47,64 +53,229 @@ function handleFilterChange() {
         }
     };
 
-    processDataBIAS(filteredBias);
+    let filteredUci = {
+        antigen: {
+            rv:         { t1: filterArray(uciSource.antigen?.rv?.["2017"]), t2: filterArray(uciSource.antigen?.rv?.["2024"]) },
+            rotarix:    { t1: filterArray(uciSource.antigen?.rotarix?.["2017"]), t2: filterArray(uciSource.antigen?.rotarix?.["2024"]) },
+            pcv:        { t1: filterArray(uciSource.antigen?.pcv?.["2017"]), t2: filterArray(uciSource.antigen?.pcv?.["2024"]) },
+            je:         { t1: filterArray(uciSource.antigen?.je?.["2017"]), t2: filterArray(uciSource.antigen?.je?.["2024"]) },
+            heksavalen: { t1: filterArray(uciSource.antigen?.heksavalen?.["2017"]), t2: filterArray(uciSource.antigen?.heksavalen?.["2024"]) }
+        },
+        baduta: {
+            booster: {
+                t1: filterArray(uciSource.baduta?.booster?.["2017"]),
+                t2: filterArray(uciSource.baduta?.booster?.["2022"]),
+                t3: filterArray(uciSource.baduta?.booster?.["2023"])
+            }
+        },
+        hb0_bcg: { t1: filterArray(uciSource.hb0_bcg?.["2024"]), t2: filterArray(uciSource.hb0_bcg?.["2025"]) },
+        tt: { t1: filterArray(uciSource.tt?.["2024"]), t2: filterArray(uciSource.tt?.["2025"]) }
+    };
+
+    const resBias = processDataBIAS(filteredBias);
+    const resUci = processDataUCI(filteredUci);
+
+    // --- UPDATE CARD STATISTIK ---
+    const totalSemuaS = (resBias.total_s || 0) + (resUci.total_s || 0);
+    const totalSemuaT = (resBias.total_t || 0) + (resUci.total_t || 0);
+    updateText('total-semua-s', totalSemuaS);
+    updateText('total-semua-t', totalSemuaT);
+
+    const totalSasaran = (resBias.sasaran_bias || 0) + (resUci.sasaran_uci || 0);
+    updateText('total-semua-sasaran', totalSasaran);
+
+    let persentase = totalSasaran > 0 ? (totalSemuaS / totalSasaran) * 100 : 0;
+    const elPersen = document.getElementById('total-semua-persen');
+    if (elPersen) {
+        elPersen.innerText = persentase.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // --- UPDATE SCATTER CHART ---
+    updateScatterChart(selectedPuskesmas);
 }
 
 // ==================================================
-// 4. PROCESSOR BIAS (PENJABARAN FORMULA HPV)
+// 4. PROCESSOR BIAS (TIDAK BERUBAH)
 // ==================================================
 function processDataBIAS(bias) {
+    const sumTotal = (arr, key) => (arr || []).reduce((a, b) => a + (Number(b[key]) || 0), 0);
     
-    // --- 1. HITUNG CAMPAK ---
-    const campak_s = bias.campak.reduce((a, b) => a + (Number(b.imun_cmk_jml) || 0), 0);
-    const campak_t = bias.campak.reduce((a, b) => a + (Number(b.ttl_abs_cmk) || 0), 0);
+    const s1 = sumTotal(bias.campak, "kls_1_mrd_br_jml") + sumTotal(bias.campak, "tdk_nk_kls_cmk");
+    const s2 = sumTotal(bias.td, 'kls_2_mrd_br_jml') + sumTotal(bias.td, 'tdk_nk_kls_td_kls_2');
+    const s5 = sumTotal(bias.td, 'kls_5_mrd_L') + sumTotal(bias.td, 'tdk_nk_kls_td_kls_5') + sumTotal(bias.hpv.kelas.kelas_5, 'ssrn_P_kls_5');
+    const s6 = sumTotal(bias.hpv.kelas.kelas_6, 'ssrn_P_kls_6');
+    const s9 = sumTotal(bias.hpv.kelas.kelas_9, 'ssrn_P_kls_9');
 
-    // --- 2. HITUNG DT ---
-    const dt_s = bias.dt.reduce((a, b) => a + (Number(b.dt_imun_jml) || 0), 0);
-    const dt_t = bias.dt.reduce((a, b) => a + (Number(b.ttl_abs_dt) || 0), 0);
+    updateText('bias-kelas-1', s1);
+    updateText('bias-kelas-2', s2);
+    updateText('bias-kelas-5', s5);
+    updateText('bias-kelas-6', s6);
+    updateText('bias-kelas-9', s9);
 
-    // --- 3. HITUNG TD (Gabungan tabel DT kls 1 & tabel TD kls 2,5) ---
-    const td_s = bias.dt.reduce((a, b) => a + (Number(b.imun_td_jml) || 0), 0) +
+    const campak_s = sumTotal(bias.campak, 'imun_cmk_jml');
+    const campak_t = sumTotal(bias.campak, 'ttl_abs_cmk');
+    const dt_s = sumTotal(bias.dt, 'dt_imun_jml');
+    const dt_t = sumTotal(bias.dt, 'ttl_abs_dt');
+    const td_s = sumTotal(bias.dt, 'imun_td_jml') + 
                  bias.td.reduce((a, b) => a + (Number(b.td_imun_jml_kls_2) || 0) + (Number(b.imun_td_jml_kls_5) || 0), 0);
-    
-    const td_t = bias.dt.reduce((a, b) => a + (Number(b.ttl_abs_td) || 0), 0) +
+    const td_t = sumTotal(bias.dt, 'ttl_abs_td') + 
                  bias.td.reduce((a, b) => a + (Number(b.ttl_abs_td_kls_2) || 0) + (Number(b.ttl_abs_td_kls_5) || 0), 0);
 
-    // --- 4. HITUNG HPV (JABARKAN PER KELAS) ---
-    const k5 = bias.hpv.kelas.kelas_5;
-    const k6 = bias.hpv.kelas.kelas_6;
-    const k9 = bias.hpv.kelas.kelas_9;
+    const hpv_s = sumTotal(bias.hpv.kelas.kelas_5, 'hpv_ttl_kls_5') + sumTotal(bias.hpv.kelas.kelas_6, 'hpv_ttl_kls_6') + sumTotal(bias.hpv.kelas.kelas_9, 'hpv_ttl_kls_9');
+    const hpv_t = sumTotal(bias.hpv.kelas.kelas_5, 'hpv_ttl_abs_kls_5') + sumTotal(bias.hpv.kelas.kelas_6, 'hpv_ttl_abs_kls_6') + sumTotal(bias.hpv.kelas.kelas_9, 'hpv_ttl_abs_kls_9');
 
-    // Kalkulasi "Sudah" per kelas
-    const hpv_s_k5 = k5.reduce((a, b) => a + (Number(b.hpv_ttl_kls_5) || 0), 0);
-    const hpv_s_k6 = k6.reduce((a, b) => a + (Number(b.hpv_ttl_kls_6) || 0), 0);
-    const hpv_s_k9 = k9.reduce((a, b) => a + (Number(b.hpv_ttl_kls_9) || 0), 0);
-
-    // Kalkulasi "Tidak" per kelas
-    const hpv_t_k5 = k5.reduce((a, b) => a + (Number(b.hpv_ttl_abs_kls_5) || 0), 0);
-    const hpv_t_k6 = k6.reduce((a, b) => a + (Number(b.hpv_ttl_abs_kls_6) || 0), 0);
-    const hpv_t_k9 = k9.reduce((a, b) => a + (Number(b.hpv_ttl_abs_kls_9) || 0), 0);
-
-    // Akumulasi Total HPV
-    const hpv_s = hpv_s_k5 + hpv_s_k6 + hpv_s_k9;
-    const hpv_t = hpv_t_k5 + hpv_t_k6 + hpv_t_k9;
-
-    // --- 5. UPDATE UI ---
     updateCard('campak', campak_s, campak_t);
-    updateCard('dt',     dt_s,     dt_t);
-    updateCard('td',     td_s,     td_t);
-    updateCard('hpv',    hpv_s,    hpv_t);
+    updateCard('dt', dt_s, dt_t);
+    updateCard('td', td_s, td_t);
+    updateCard('hpv', hpv_s, hpv_t);
 
-    // Hitung Grand Total BIAS
-    const total_s = campak_s + dt_s + td_s + hpv_s;
-    const total_t = campak_t + dt_t + td_t + hpv_t;
-
-    updateText('total-semua-s', total_s);
-    updateText('total-semua-t', total_t);
+    return { 
+        total_s: campak_s + dt_s + td_s + hpv_s, 
+        total_t: campak_t + dt_t + td_t + hpv_t,
+        sasaran_bias: s1 + s2 + s5 + s6 + s9
+    };
 }
 
 // ==================================================
-// 5. UI HELPERS
+// 5. PROCESSOR UCI (TIDAK BERUBAH)
+// ==================================================
+function processDataUCI(uci) {
+    const sumS = (antigenObj, keys) => {
+        let t = 0; if (!antigenObj) return 0;
+        Object.values(antigenObj).forEach(arr => {
+            if (Array.isArray(arr)) arr.forEach(d => { keys.forEach(k => t += (Number(d[k]) || 0)); });
+        });
+        return t;
+    };
+
+    const sumT = (antigenObj) => {
+        let t = 0; if (!antigenObj) return 0;
+        Object.values(antigenObj).forEach(arr => {
+            if (Array.isArray(arr)) arr.forEach(d => {
+                t += (Number(d.mati_L) || 0) + (Number(d.mati_P) || 0) + (Number(d.pindah_L) || 0) + (Number(d.pindah_P) || 0) + (Number(d.menolak_L) || 0) + (Number(d.menolak_P) || 0);
+            });
+        });
+        return t;
+    };
+
+    const sumPopulasi = (arr, callName) => (arr || []).reduce((a, b) => a + (Number(b[callName]) || 0), 0);
+
+    const u17 = sumPopulasi(uci.antigen.rv.t1, 'bayi_lhr_hdp_2017_jml');
+    const u22 = sumPopulasi(uci.baduta.booster.t2, 'bayi_lhr_hdp_2022_jml');
+    const u23 = sumPopulasi(uci.baduta.booster.t3, 'bayi_lhr_hdp_2023_jml');
+    const u24 = sumPopulasi(uci.hb0_bcg.t1, 'bayi_lhr_hdp_2024_jml');
+    const u25 = sumPopulasi(uci.hb0_bcg.t2, 'bayi_lhr_hdp_2025_jml');
+
+    updateText('uci-2017', u17);
+    updateText('uci-2022', u22);
+    updateText('uci-2023', u23);
+    updateText('uci-2024', u24);
+    updateText('uci-2025', u25);
+
+    const p4 = sumS(uci.baduta.booster, ['pentabio_4_jml']);
+    const mr2 = sumS(uci.baduta.booster, ['mr_2_jml']);
+    const lengkapBoosterRaw = sumS(uci.baduta.booster, ['lengkap_jml']);
+    const lengkapBoosterFiltered = Math.max(0, lengkapBoosterRaw - p4 - mr2);
+
+    const hb0_val = sumS(uci.hb0_bcg, ['hb0_jml']);
+    const bcg_val = sumS(uci.hb0_bcg, ['bcg_jml']);
+    const lengkapHB0Raw = sumS(uci.hb0_bcg, ['lengkap_jml']);
+    const lengkapHB0Filtered = Math.max(0, lengkapHB0Raw - hb0_val - bcg_val);
+
+    const hasil = {
+        rv:      { s: sumS(uci.antigen.rv, ['rv_1_jml', 'rv_2_jml', 'rv_3_jml']), t: sumT(uci.antigen.rv) },
+        rotarix: { s: sumS(uci.antigen.rotarix, ['rotarix_1_jml', 'rotarix_2_jml']), t: sumT(uci.antigen.rotarix) },
+        pcv:     { s: sumS(uci.antigen.pcv, ['pcv_1_jml', 'pcv_2_jml', 'pcv_3_jml']), t: sumT(uci.antigen.pcv) },
+        je:      { s: sumS(uci.antigen.je, ['je_1_jml']), t: sumT(uci.antigen.je) },
+        heksa:   { s: sumS(uci.antigen.heksavalen, ['heksavalen_1_jml', 'heksavalen_2_jml', 'heksavalen_3_jml']), t: sumT(uci.antigen.heksavalen) },
+        booster: { s: p4 + mr2 + lengkapBoosterFiltered, t: sumT(uci.baduta.booster) },
+        hb0_bcg: { s: hb0_val + bcg_val + lengkapHB0Filtered, t: sumT(uci.hb0_bcg) },
+        tt:      { s: sumS(uci.tt, ['total']), t: sumT(uci.tt) }
+    };
+
+    Object.keys(hasil).forEach(k => updateCard(k, hasil[k].s, hasil[k].t));
+
+    return {
+        total_s: Object.values(hasil).reduce((a, b) => a + b.s, 0),
+        total_t: Object.values(hasil).reduce((a, b) => a + b.t, 0),
+        sasaran_uci: u17 + u22 + u23 + u24 + u25
+    };
+}
+
+// ==================================================
+// 6. SCATTER CHART LOGIC (DENGAN LABEL VERTIKAL)
+// ==================================================
+function updateScatterChart(filterPusk) {
+    const scatterEl = document.getElementById('scatterChart');
+    if (!scatterEl || !cachedData) return;
+
+    const bias = cachedData.program_imunisasi.bias;
+    const uci = cachedData.program_imunisasi.uci;
+
+    let allPusk = [...new Set(bias.campak.map(d => d.Pukesmas || d.Puskesmas || d.puskesmas))];
+    if (filterPusk !== 'all') allPusk = allPusk.filter(p => p === filterPusk);
+
+    const scatterData = allPusk.map(namaPusk => {
+        const b_s = bias.campak.filter(d => (d.Pukesmas||d.Puskesmas||d.puskesmas) === namaPusk).reduce((a, b) => a + (Number(b.imun_cmk_jml) || 0), 0) +
+                    bias.dt.filter(d => (d.Pukesmas||d.Puskesmas||d.puskesmas) === namaPusk).reduce((a, b) => a + (Number(b.dt_imun_jml) || 0), 0);
+        
+        const u_s = uci.baduta.booster["2023"].filter(d => (d.Pukesmas||d.Puskesmas||d.puskesmas) === namaPusk).reduce((a, b) => a + (Number(b.lengkap_jml) || 0), 0);
+
+        return { x: b_s, y: u_s, label: namaPusk };
+    });
+
+    if (scatterChartInstance) {
+        scatterChartInstance.data.datasets[0].data = scatterData;
+        scatterChartInstance.update();
+    } else {
+        scatterChartInstance = new Chart(scatterEl, {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Puskesmas',
+                    data: scatterData,
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                    borderColor: 'red',
+                    pointRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                // Tambahkan padding top yang cukup tinggi agar label vertikal tidak terpotong
+                layout: { padding: { top: 80, right: 30 } },
+                plugins: {
+                    title: { display: true, text: 'Perbandingan BIAS vs UCI Per Puskesmas', font: { size: 16 } },
+                    datalabels: {
+                        display: true,
+                        // Penyesuaian Posisi Vertikal
+                        align: 'end',      // Muncul di ujung luar titik
+                        anchor: 'end',     // Jangkar di luar titik
+                        rotation: -90,     // Membuat teks vertikal (90 derajat berlawanan jarum jam)
+                        offset: 10,        // Jarak dari titik ke teks
+                        formatter: function(value) {
+                            return value.label; 
+                        },
+                        font: { weight: 'bold', size: 10 },
+                        color: '#444',
+                        clip: false        // Pastikan tidak terpotong tepi canvas
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.raw.label}: (BIAS: ${ctx.raw.x}, UCI: ${ctx.raw.y})`
+                        }
+                    }
+                },
+                scales: {
+                    x: { title: { display: true, text: 'Total BIAS' }, beginAtZero: true },
+                    y: { title: { display: true, text: 'Total UCI' }, beginAtZero: true }
+                }
+            }
+        });
+    }
+}
+
+// ==================================================
+// 7. UI HELPERS (TIDAK BERUBAH)
 // ==================================================
 function updateText(id, val) {
     const el = document.getElementById(id);
@@ -121,69 +292,13 @@ function populatePuskesmasFilter() {
     if (!selector || !cachedData) return;
     const puskSet = new Set();
     const bias = cachedData.program_imunisasi.bias;
-
-    // Ambil dari campak (Flat)
-    if (Array.isArray(bias.campak)) bias.campak.forEach(d => puskSet.add(d.Pukesmas || d.Puskesmas));
-
-    [...puskSet].filter(Boolean).sort().forEach(p => {
-        selector.add(new Option(p, p));
-    });
+    if (Array.isArray(bias.campak)) {
+        bias.campak.forEach(d => puskSet.add(d.Pukesmas || d.Puskesmas || d.puskesmas));
+    }
+    [...puskSet].filter(Boolean).sort().forEach(p => selector.add(new Option(p, p)));
 }
 
 document.addEventListener('DOMContentLoaded', fetchImunisasiData);
-
-
-
-function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    if (!sidebar) return;
-
-    sidebar.classList.toggle('collapsed');
-}
-
-/* ================= PAGE NAVIGATION ================= */
-function changePage(pageId, el) {
-    document.querySelectorAll('.page').forEach(p => {
-        p.classList.remove('active');
-    });
-
-    const target = document.getElementById(pageId);
-    if (target) {
-        target.classList.add('active');
-    }
-
-    document.querySelectorAll('.sidebar li').forEach(li => {
-        li.classList.remove('active');
-    });
-
-    if (el) el.classList.add('active');
-}
-
-/* ================= CHART INITIALIZATION ================= */
-document.addEventListener("DOMContentLoaded", function () {
-
-    /* ================= SCATTER CHART ================= */
-    const scatterEl = document.getElementById('scatterChart');
-    if (scatterEl) {
-        new Chart(scatterEl, {
-            type: 'scatter',
-            data: {
-                datasets: [{
-                    label: 'Puskesmas',
-                    data: [
-                        { x: 1, y: 20 },
-                        { x: 2, y: 35 },
-                        { x: 3, y: 50 },
-                        { x: 4, y: 65 }
-                    ],
-                    backgroundColor: 'red'
-                }]
-            },
-            options: {
-                responsive: true
-            }
-        });
-    }
 
     /* ================= DISTRIBUSI USIA ================= */
     const usiaEl = document.getElementById('usiaChart');
@@ -336,5 +451,3 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     }
-
-});

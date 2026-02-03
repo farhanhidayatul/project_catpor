@@ -7,6 +7,7 @@
 
     <!-- Chart.js (WAJIB JANGAN DIHAPUS) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
     <link rel="stylesheet" href="style.css">
 </head>
@@ -121,6 +122,30 @@
                         </div>
 
                         <div class="card green">
+                            <h4>Total Imunisasi ROTARIX (Sudah)</h4>
+                            <h1 id="total-rotarix-s">0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi ROTARIX (Tidak)</h4>
+                            <h1 id="total-rotarix-t">0</h1>
+                        </div>
+                        <div class="card green">
+                            <h4>Total Imunisasi PCV (Sudah)</h4>
+                            <h1 id="total-pcv-s">0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi PCV (Tidak)</h4>
+                            <h1 id="total-pcv-t">0</h1>
+                        </div>
+                        <div class="card green">
+                            <h4>Total Imunisasi JE (Sudah)</h4>
+                            <h1 id="total-je-s">0</h1>
+                        </div>
+                        <div class="card red">
+                            <h4>Total Imunisasi JE (Tidak)</h4>
+                            <h1 id="total-je-t">0</h1>
+                        </div>
+                        <div class="card green">
                             <h4>Total Imunisasi HEKSAVALEN (Sudah)</h4>
                             <h1 id="total-heksa-s">0</h1>
                         </div>
@@ -130,113 +155,59 @@
                         </div>
                         <div class="card green">
                             <h4>Total Imunisasi BOOSTER (Sudah)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-booster-s">0</h1>
                         </div>
                         <div class="card red">
                             <h4>Total Imunisasi BOOSTER (Tidak)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-booster-t">0</h1>
                         </div>
                         <div class="card green">
                             <h4>Total Imunisasi HB0 BCG (Sudah)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-hb0_bcg-s">0</h1>
                         </div>
                         <div class="card red">
                             <h4>Total Imunisasi HB0 BCG (Tidak)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-hb0_bcg-t">0</h1>
                         </div>
                         <div class="card green">
                             <h4>Total Imunisasi TT (Sudah)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-tt-s">0</h1>
                         </div>
                         <div class="card red">
                             <h4>Total Imunisasi TT (Tidak)</h4>
-                            <h1>0</h1>
+                            <h1 id="total-tt-t">0</h1>
                         </div>
 
                     </div>
 
                     <div class="row">
                         <div class="card cyan">
-                            <h4>Kelas 1 (Campak)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                            <h4>KATEGORI BIAS IMUNISASI</h4>
+                            <p>Total Siswa Kelas 1: <span id="bias-kelas-1">0</span></p>
+                            <p>Total Siswa Kelas 2: <span id="bias-kelas-2">0</span></p>
+                            <p>Total Siswa Kelas 5: <span id="bias-kelas-5">0</span></p>
+                            <p>Total Siswa Kelas 6: <span id="bias-kelas-6">0</span></p>
+                            <p>Total Siswa Kelas 9: <span id="bias-kelas-9">0</span></p>
                         </div>
 
                         <div class="card cyan">
-                            <h4>Kelas 1 (DT)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
-                        </div>
-
-                        <div class="card cyan">
-                            <h4>Kelas 1 (TD)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
-                        </div>
-
-                        <div class="card cyan">
-                            <h4>Kelas 2 (DT)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
-                        </div>
-
-                        <div class="card cyan">
-                            <h4>Kelas 2 (TD)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
-                        </div>
-
-                        <div class="card cyan">
-                            <h4>Kelas 5 (TD)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
-                        </div>
-
-                        <div class="card cyan">
-                            <h4>Kelas 5 (HPV)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
-                        </div>
-
-                        <div class="card cyan">
-                            <h4>Kelas 6 (HPV)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
-                        </div>
-
-                         <div class="card cyan">
-                            <h4>Kelas 9 (HPV)</h4>
-                            <p>Sudah Imunisasi: 17</p>
-                            <p>Tidak Imunisasi: 1.266</p>
-                            <p>Sudah Imunisasi namun tidak naik kelas: 2.198</p>
-                            <p>Tidak Imunisasi namun tidak naik kelas: 2.198</p>
+                            <h4>KATEGORI UCI IMUNISASI</h4>
+                            <p>Bayi Lahir Tahun 2017: <span id="uci-2017">0</span></p>
+                            <p>Bayi Lahir Tahun 2022: <span id="uci-2022">0</span></p>
+                            <p>Bayi Lahir Tahun 2023: <span id="uci-2023">0</span></p>
+                            <p>Bayi Lahir Tahun 2024: <span id="uci-2024">0</span></p>
+                            <p>Bayi Lahir Tahun 2025: <span id="uci-2025">0</span></p>
                         </div>
                     </div>
 
                     <div class="row">
                         <div class="card pink">
-                            <h4>Total pelajar dan bayi lahir (%)</h4>
-                            <h1>51,47</h1>
+                            <h4>Total pelajar, bayi lahir, dan ibu hamil (%)</h4>
+                            <h1 id="total-semua-persen">0</h1>
                         </div>
                         <div class="card orange">
-                            <h4>Total pelajar dan bayi lahir</h4>
-                            <h1>13.419</h1>
+                            <h4>Total pelajar, bayi lahir, dan ibu hamil</h4>
+                            <h1 id="total-semua-sasaran">0</h1>
                         </div>
                     </div>
 
