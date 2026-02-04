@@ -11,6 +11,10 @@ let tahunChartInstance = null; // Menambahkan instance untuk trend tahunan
 
 // FITUR DISTRIBUSI VARIABEL
 let alasanChartInstance = null;
+let logistikCampakInstance = null;
+let logistikDtInstance = null;
+let logistikTdInstance = null;
+let logistikHpvInstance = null;
 
 
 if (typeof ChartDataLabels !== 'undefined') {
@@ -129,6 +133,11 @@ function handleFilterChange() {
     updateJKChart(resBias.jk.L + resUci.jk.L, resBias.jk.P + resUci.jk.P);
     updateDistribusiTahunChart(selectedPuskesmas);
     updateAlasanChart(filteredBias);
+    updateLogistikCampakChart(filteredBias);
+    updateLogistikDtChart(filteredBias);
+    updateLogistikTdChart(filteredBias);
+    updateLogistikHpvChart(filteredBias);
+    
 }
 
 /* ==================================================
@@ -674,10 +683,11 @@ function updateAlasanChart(bias) {
                 indexAxis: 'y', // Baris horizontal
                 responsive: true,
                 maintainAspectRatio: false, // Tinggi mengikuti container
+                devicePixelRatio: 2,
                 plugins: {
                     legend: { 
                         position: 'top',
-                        labels: { font: { weight: 'bold' } }
+                        labels: { font: { weight: 'bold', size: 11 } }
                     },
                     title: { display: false }, // Judul ditiadakan sesuai permintaan
                     datalabels: {
@@ -697,9 +707,298 @@ function updateAlasanChart(bias) {
                         stacked: true,
                         ticks: {
                             autoSkip: false,
-                            font: { size: 11 }
+                            font: { size: 11 },
+                            lineHeight: 1.2,
+                            padding: 8
                         }
                     }
+                }
+            }
+        });
+    }
+}
+
+function updateLogistikCampakChart(filteredBias) {
+    const canvas = document.getElementById('logistikCampakChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Ambil data Campak dari objek filteredBias
+    const dataCampak = filteredBias.campak || [];
+
+    // Helper penjumlahan yang aman dari undefined/null
+    const sumLogistik = (targetArray, key) => {
+        return targetArray.reduce((total, d) => total + (Number(d[key]) || 0), 0);
+    };
+
+    // Kalkulasi data berdasarkan Key JSON
+    const logistikData = [
+        sumLogistik(dataCampak, 'lgst_vksn_cmk'),
+        sumLogistik(dataCampak, 'plrt_cmk_dss'),
+        sumLogistik(dataCampak, 'ads_0.5ml'), // Pastikan di JSON pakai titik atau underscore
+        sumLogistik(dataCampak, 'ads_5ml'),
+        sumLogistik(dataCampak, 'saf_box')
+    ];
+
+    // 3. Render atau Update Chart
+    if (logistikCampakInstance) {
+        logistikCampakInstance.data.datasets[0].data = logistikData;
+        logistikCampakInstance.update();
+    } else {
+        logistikCampakInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [
+                    'Logistik Vaksin', 
+                    'Pelarut Dosis', 
+                    'ADS 0.5ml', 
+                    'ADS 5ml', 
+                    'Safety Box'
+                ],
+                datasets: [{
+                    label: 'Jumlah Stok/Pemakaian',
+                    data: logistikData,
+                    backgroundColor: '#FF7043', // Warna Teal
+                    borderColor: '#ff5b29',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }, // Sembunyikan legend jika hanya 1 dataset
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#444',
+                        font: { weight: 'bold' },
+                        formatter: (val) => val > 0 ? val : ''
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { display: true },
+                        title: { display: true, text: 'Kuantitas' }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function updateLogistikDtChart(filteredBias) {
+    const canvas = document.getElementById('logistikDtChart'); // Pastikan ID canvas di HTML berbeda
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Ambil data DT dari objek filteredBias
+    const dataDt = filteredBias.dt || [];
+
+    // Helper penjumlahan yang aman
+    const sumLogistik = (targetArray, key) => {
+        return targetArray.reduce((total, d) => total + (Number(d[key]) || 0), 0);
+    };
+
+    // Kalkulasi data berdasarkan Key JSON khusus DT
+    // CATATAN: Pastikan nama key ini (contoh: 'lgst_vksn_dt') sesuai dengan JSON Anda
+    const logistikData = [
+        sumLogistik(dataDt, 'lgst_vksn_dt'),    // Logistik Vaksin DT
+        sumLogistik(dataDt, 'ads_0.5ml'),    // ADS 0.5ml DT
+        sumLogistik(dataDt, 'saf_box')       // Safety Box DT
+    ];
+
+    if (logistikDtInstance) {
+        logistikDtInstance.data.datasets[0].data = logistikData;
+        logistikDtInstance.update();
+    } else {
+        logistikDtInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [
+                    'Logistik Vaksin DT', 
+                    'ADS 0.5ml', 
+                    'Safety Box'
+                ],
+                datasets: [{
+                    label: 'Jumlah Stok/Pemakaian',
+                    data: logistikData,
+                    backgroundColor: '#42A5F5', // Warna Biru (Sesuai tema DT Anda)
+                    borderColor: '#1E88E5',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#444',
+                        font: { weight: 'bold' },
+                        formatter: (val) => val > 0 ? val : ''
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Kuantitas' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+}
+
+function updateLogistikTdChart(filteredBias) {
+    const canvas = document.getElementById('logistikTdChart'); // Pastikan ID ini ada di HTML
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // 1. Ambil data TD dari objek filteredBias
+    const dataTd = filteredBias.td || [];
+
+    // 2. Helper penjumlahan (menggunakan reduce seperti versi sebelumnya)
+    const sumLogistik = (targetArray, key) => {
+        return targetArray.reduce((total, d) => total + (Number(d[key]) || 0), 0);
+    };
+
+    /**
+     * 3. Kalkulasi data berdasarkan Key JSON khusus TD
+     * Sesuaikan nama key (string) di bawah ini dengan kolom di database/JSON Anda
+     */
+    const logistikData = [
+        sumLogistik(dataTd, 'lgst_vksn_td'),    // Logistik Vaksin TD
+        sumLogistik(dataTd, 'ads_0.5ml'),    // ADS 0.5ml TD
+    ];
+
+    // 4. Render atau Update Chart
+    if (logistikTdInstance) {
+        // Jika chart sudah ada, cukup update datanya saja
+        logistikTdInstance.data.datasets[0].data = logistikData;
+        logistikTdInstance.update();
+    } else {
+        // Jika belum ada, buat chart baru
+        logistikTdInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [
+                    'Logistik Vaksin TD', 
+                    'ADS 0.5ml' 
+                ],
+                datasets: [{
+                    label: 'Jumlah Stok/Pemakaian',
+                    data: logistikData,
+                    backgroundColor: '#66BB6A', // Warna Hijau (Tema TD)
+                    borderColor: '#43A047',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#444',
+                        font: { weight: 'bold' },
+                        formatter: (val) => val > 0 ? val : ''
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Kuantitas' }
+                    },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+}
+
+function updateLogistikHpvChart(filteredBias) {
+    const canvas = document.getElementById('logistikHpvChart'); // Pastikan ID ini ada di HTML
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    /**
+     * 1. Gabungkan Data HPV (Pembeda Utama)
+     * Karena HPV terdiri dari beberapa array kelas, kita gabungkan menjadi satu targetArray
+     */
+    const dataHpv = [
+        ...(filteredBias.hpv?.kelas?.kelas_5 || []),
+        ...(filteredBias.hpv?.kelas?.kelas_6 || []),
+        ...(filteredBias.hpv?.kelas?.kelas_9 || [])
+    ];
+
+    // 2. Helper penjumlahan
+    const sumLogistik = (targetArray, key) => {
+        if (!targetArray || targetArray.length === 0) return 0;
+        return targetArray.reduce((total, d) => total + (Number(d[key]) || 0), 0);
+    };
+
+    /**
+     * 3. Kalkulasi data berdasarkan Key JSON khusus HPV
+     * Sesuaikan nama key di bawah ini dengan kolom di JSON Anda
+     */
+    const logistikData = [
+        sumLogistik(dataHpv, 'lgst_vksn_hpv'),    // Logistik Vaksin HPV
+        sumLogistik(dataHpv, 'ads_0.5ml'),    // ADS 0.5ml HPV
+        sumLogistik(dataHpv, 'saf_box'),      // Safety Box HPV
+        sumLogistik(dataHpv, 'kipi_hpv')       // KIPI HPV
+    ];
+
+    // 4. Render atau Update Chart
+    if (logistikHpvInstance) {
+        logistikHpvInstance.data.datasets[0].data = logistikData;
+        logistikHpvInstance.update();
+    } else {
+        logistikHpvInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [
+                    'Logistik Vaksin HPV',  
+                    'ADS 0.5ml', 
+                    'Safety Box', 
+                    'KIPI HPV'
+                ],
+                datasets: [{
+                    label: 'Jumlah Stok/Pemakaian',
+                    data: logistikData,
+                    backgroundColor: '#AB47BC', // Warna Ungu (Tema HPV)
+                    borderColor: '#8E24AA',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        color: '#444',
+                        font: { weight: 'bold' },
+                        formatter: (val) => val > 0 ? val : ''
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Kuantitas' }
+                    },
+                    x: { grid: { display: false } }
                 }
             }
         });
@@ -723,21 +1022,21 @@ function populatePuskesmasFilter() {
 
 document.addEventListener('DOMContentLoaded', fetchImunisasiData);
 
-    /* ================= DISTRIBUSI PUSKESMAS PAGE ================= */
-    const faktor = document.getElementById('envFaktorRisikoChart');
-    if (faktor) {
-        new Chart(faktor, {
-            type: 'bar',
-            data: {
-                labels: ['APD', 'Air', 'Higiene'],
-                datasets: [{
-                    label: 'Jumlah',
-                    data: [120, 80, 60],
-                    backgroundColor: '#90caf9'
-                }]
-            }
-        });
-    }
+    // /* ================= DISTRIBUSI PUSKESMAS PAGE ================= */
+    // const faktor = document.getElementById('envFaktorRisikoChart');
+    // if (faktor) {
+    //     new Chart(faktor, {
+    //         type: 'bar',
+    //         data: {
+    //             labels: ['APD', 'Air', 'Higiene'],
+    //             datasets: [{
+    //                 label: 'Jumlah',
+    //                 data: [120, 80, 60],
+    //                 backgroundColor: '#90caf9'
+    //             }]
+    //         }
+    //     });
+    // }
 
     const pelatihan = document.getElementById('envPelatihanChart');
     if (pelatihan) {
