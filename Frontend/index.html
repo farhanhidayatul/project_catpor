@@ -192,11 +192,33 @@
 
                         <div class="card cyan">
                             <h4>KATEGORI UCI IMUNISASI</h4>
-                            <p>Bayi Lahir Tahun 2017: <span id="uci-2017">0</span></p>
-                            <p>Bayi Lahir Tahun 2022: <span id="uci-2022">0</span></p>
-                            <p>Bayi Lahir Tahun 2023: <span id="uci-2023">0</span></p>
-                            <p>Bayi Lahir Tahun 2024: <span id="uci-2024">0</span></p>
-                            <p>Bayi Lahir Tahun 2025: <span id="uci-2025">0</span></p>
+                            <table border="0" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td>Bayi Lahir 2017</td>
+                                    <td style="padding: 0 10px;">:</td>
+                                    <td><span id="uci-2017">0</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Bayi Lahir 2022</td>
+                                    <td style="padding: 0 10px;">:</td>
+                                    <td><span id="uci-2022">0</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Bayi Lahir 2023</td>
+                                    <td style="padding: 0 10px;">:</td>
+                                    <td><span id="uci-2023">0</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Bayi Lahir dan bumil 2024</td>
+                                    <td style="padding: 0 10px;">:</td>
+                                    <td><span id="uci-2024">0</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Bayi Lahir dan bumil 2025</td>
+                                    <td style="padding: 0 10px;">:</td>
+                                    <td><span id="uci-2025">0</span></td>
+                                </tr>
+                            </table>
                         </div>
                     </div>
 
@@ -217,15 +239,7 @@
                     </div>
 
                     <div class="row">
-                        <div class="card chart">
-                            <h4>Distribusi berdasarkan Kelas</h4>
-                            <canvas id="usiaChart"></canvas>
-                        </div>
 
-                        <div class="card chart">
-                            <h4>Distribusi Jenis Kelamin</h4>
-                            <canvas id="jkChart"></canvas>
-                        </div>
                     </div>
 
                 </div>
@@ -240,6 +254,14 @@
                     <div class="card chart">
                         <h4>Imunisasi Berdasarkan BIAS dan UCI</h4>
                         <canvas id="trendChart"></canvas>
+                    </div>
+                    <div class="card chart">
+                        <h4>Distribusi berdasarkan Kelas</h4>
+                        <canvas id="kelasChart"></canvas>
+                    </div>
+                    <div class="card chart">
+                        <h4>Distribusi Jenis Kelamin</h4>
+                        <canvas id="jkChart"></canvas>
                     </div>
                 </div>
 

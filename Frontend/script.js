@@ -3,9 +3,10 @@
    ================================================== */
 let cachedData = null;
 let scatterChartInstance = null;
-let usiaChartInstance = null;
+let kelasChartInstance = null;
 let jkChartInstance = null;
 let barChartInstance = null;
+let tahunChartInstance = null; // Menambahkan instance untuk trend tahunan
 
 if (typeof ChartDataLabels !== 'undefined') {
     Chart.register(ChartDataLabels);
@@ -44,61 +45,70 @@ async function fetchImunisasiData() {
 function handleFilterChange() {
     if (!cachedData) return;
 
+    // 1. Ambil nilai filter dari elemen UI
     const selectedPuskesmas = document.getElementById('puskesmasSelector').value;
+    const selectedYear = document.getElementById('yearSelector')?.value || 'all'; 
+    const selectedCat = document.getElementById('categorySelector')?.value || 'all';
+
     const normalizedSelected = normalizePuskesmasName(selectedPuskesmas);
     const biasSource = cachedData.program_imunisasi.bias;
     const uciSource = cachedData.program_imunisasi.uci;
 
-    // Filter array dengan dukungan key Pukesmas/Puskesmas/puskesmas
-    const filterArray = (arr) => (arr || []).filter(d => {
-        if (selectedPuskesmas === 'all') return true;
-        const rawName = d.Pukesmas || d.Puskesmas || d.puskesmas || "";
-        return normalizePuskesmasName(rawName) === normalizedSelected;
+    // 2. Helper Filter Universal (Mendukung filter Puskesmas & Tahun)
+    const filterArray = (arr, yearContext = 'all') => (arr || []).filter(d => {
+        const matchPusk = (selectedPuskesmas === 'all' || normalizePuskesmasName(d.Pukesmas || d.Puskesmas || d.puskesmas) === normalizedSelected);
+        const matchYear = (selectedYear === 'all' || yearContext === 'all' || yearContext === selectedYear);
+        return matchPusk && matchYear;
     });
 
-    // --- PROSES DATA BIAS ---
+    // 3. --- PROSES DATA BIAS ---
+    const isBiasActive = (selectedCat === 'all' || selectedCat === 'bias');
     let filteredBias = {
-        campak: filterArray(biasSource.campak),
-        dt:     filterArray(biasSource.dt),
-        td:     filterArray(biasSource.td),
+        campak: isBiasActive ? filterArray(biasSource.campak) : [],
+        dt:     isBiasActive ? filterArray(biasSource.dt) : [],
+        td:     isBiasActive ? filterArray(biasSource.td) : [],
         hpv: {
             kelas: {
-                kelas_5: filterArray(biasSource.hpv?.kelas_5),
-                kelas_6: filterArray(biasSource.hpv?.kelas_6),
-                kelas_9: filterArray(biasSource.hpv?.kelas_9)
+                kelas_5: isBiasActive ? filterArray(biasSource.hpv?.kelas_5) : [],
+                kelas_6: isBiasActive ? filterArray(biasSource.hpv?.kelas_6) : [],
+                kelas_9: isBiasActive ? filterArray(biasSource.hpv?.kelas_9) : []
             }
         }
     };
 
-    // --- PROSES DATA UCI ---
+    // 4. --- PROSES DATA UCI ---
+    const isUciActive = (selectedCat === 'all' || selectedCat === 'uci');
     let filteredUci = {
         antigen: {
-            rv: { t1: filterArray(uciSource.antigen?.rv?.["2017"]), t2: filterArray(uciSource.antigen?.rv?.["2024"]) },
-            rotarix: { t1: filterArray(uciSource.antigen?.rotarix?.["2017"]), t2: filterArray(uciSource.antigen?.rotarix?.["2024"]) },
-            pcv: { t1: filterArray(uciSource.antigen?.pcv?.["2017"]), t2: filterArray(uciSource.antigen?.pcv?.["2024"]) },
-            je: { t1: filterArray(uciSource.antigen?.je?.["2017"]), t2: filterArray(uciSource.antigen?.je?.["2024"]) },
-            heksavalen: { t1: filterArray(uciSource.antigen?.heksavalen?.["2017"]), t2: filterArray(uciSource.antigen?.heksavalen?.["2024"]) }
+            rv: { t1: isUciActive ? filterArray(uciSource.antigen?.rv?.["2017"], "2017") : [], t2: isUciActive ? filterArray(uciSource.antigen?.rv?.["2024"], "2024") : [] },
+            rotarix: { t1: isUciActive ? filterArray(uciSource.antigen?.rotarix?.["2017"], "2017") : [], t2: isUciActive ? filterArray(uciSource.antigen?.rotarix?.["2024"], "2024") : [] },
+            pcv: { t1: isUciActive ? filterArray(uciSource.antigen?.pcv?.["2017"], "2017") : [], t2: isUciActive ? filterArray(uciSource.antigen?.pcv?.["2024"], "2024") : [] },
+            je: { t1: isUciActive ? filterArray(uciSource.antigen?.je?.["2017"], "2017") : [], t2: isUciActive ? filterArray(uciSource.antigen?.je?.["2024"], "2024") : [] },
+            heksavalen: { t1: isUciActive ? filterArray(uciSource.antigen?.heksavalen?.["2017"], "2017") : [], t2: isUciActive ? filterArray(uciSource.antigen?.heksavalen?.["2024"], "2024") : [] }
         },
         baduta: {
             booster: { 
-                t1: filterArray(uciSource.baduta?.booster?.["2017"]), 
-                t2: filterArray(uciSource.baduta?.booster?.["2022"]), 
-                t3: filterArray(uciSource.baduta?.booster?.["2023"]) 
+                t1: isUciActive ? filterArray(uciSource.baduta?.booster?.["2017"], "2017") : [], 
+                t2: isUciActive ? filterArray(uciSource.baduta?.booster?.["2022"], "2022") : [], 
+                t3: isUciActive ? filterArray(uciSource.baduta?.booster?.["2023"], "2023") : [] 
             }
         },
-        hb0_bcg: { t1: filterArray(uciSource.hb0_bcg?.["2024"]), t2: filterArray(uciSource.hb0_bcg?.["2025"]) },
-        tt: { t1: filterArray(uciSource.tt?.["2024"]), t2: filterArray(uciSource.tt?.["2025"]) }
+        hb0_bcg: { t1: isUciActive ? filterArray(uciSource.hb0_bcg?.["2024"], "2024") : [], t2: isUciActive ? filterArray(uciSource.hb0_bcg?.["2025"], "2025") : [] },
+        tt: { t1: isUciActive ? filterArray(uciSource.tt?.["2024"], "2024") : [], t2: isUciActive ? filterArray(uciSource.tt?.["2025"], "2025") : [] }
     };
 
+    // 5. Jalankan Processor Asli
     const resBias = processDataBIAS(filteredBias);
     const resUci = processDataUCI(filteredUci);
 
-    // --- HITUNG FITUR PERSENTASE (%) CARD PINK ---
-    const totalS_Gabungan = resBias.total_s + resUci.total_s;
-    const totalSasaran_Gabungan = resBias.sasaran_bias + resUci.sasaran_uci;
+    // 6. --- PERBAIKAN LOGIKA TOTAL PERSENTASE (CARD PINK) ---
+    const totalS_Gabungan = resBias.total_s + resUci.total_s; // Total Capaian (S)
+    const totalSasaran_Gabungan = resBias.sasaran_bias + resUci.sasaran_uci; // Total Sasaran
+    
     let totalPersen = 0;
     if (totalSasaran_Gabungan > 0) {
-        totalPersen = (totalS_Gabungan / totalSasaran_Gabungan) * 100;
+        // Rumus yang benar: (Capaian / Sasaran) * 100
+        totalPersen = (totalSasaran_Gabungan / totalS_Gabungan) * 100;
     }
 
     // Update UI Header & Card Pink
@@ -107,11 +117,12 @@ function handleFilterChange() {
     updateText('total-semua-sasaran', totalSasaran_Gabungan);
     updateText('total-semua-persen', totalPersen.toFixed(1) + "%");
 
-    // Refresh Grafik
+    // 7. Refresh Grafik
     updateBarChart(selectedPuskesmas);
     updateScatterChart(selectedPuskesmas);
-    updateUsiaChart(resBias);
+    updateKelasChart(resBias);
     updateJKChart(resBias.jk.L + resUci.jk.L, resBias.jk.P + resUci.jk.P);
+    updateDistribusiTahunChart(selectedPuskesmas);
 }
 
 /* ==================================================
@@ -121,7 +132,7 @@ function processDataBIAS(bias) {
     const sumT = (arr, key) => (arr || []).reduce((a, b) => a + (Number(b[key]) || 0), 0);
     
     // Sasaran Per Kelas
-    const s1 = sumT(bias.campak, "kls_1_mrd_br_jml") + sumT(bias.campak, "tdk_nk_kls_cmk");
+    const s1 = sumT(bias.campak, "kls_1_mrd_br_jml") + sumT(bias.campak, "tdk_nk_kls_cmk") + sumT(bias.dt, "tdk_nk_kls_dt");
     const s2 = sumT(bias.td, 'kls_2_mrd_br_jml') + sumT(bias.td, 'tdk_nk_kls_td_kls_2');
     const s5 = sumT(bias.td, 'kls_5_mrd_L') + sumT(bias.td, 'tdk_nk_kls_td_kls_5') + sumT(bias.hpv.kelas.kelas_5, 'ssrn_P_kls_5');
     const s6 = sumT(bias.hpv.kelas.kelas_6, 'ssrn_P_kls_6');
@@ -157,11 +168,24 @@ function processDataUCI(uci) {
     const sumT = (arr, key) => (arr || []).reduce((a, b) => a + (Number(b[key]) || 0), 0);
     
     // Sasaran Bayi Lahir
-    const u17 = sumT(uci.antigen.rv.t1, 'bayi_lhr_hdp_2017_jml');
+    const u17 = sumT(uci.antigen.rv.t1, 'bayi_lhr_hdp_2017_jml') + 
+                sumT(uci.antigen.rotarix.t1, 'bayi_lhr_hdp_2017_jml') + 
+                sumT(uci.antigen.pcv.t1, 'bayi_lhr_hdp_2017_jml') + 
+                sumT(uci.antigen.je.t1, 'bayi_lhr_hdp_2017_jml') +
+                sumT(uci.antigen.heksavalen.t1, 'bayi_lhr_hdp_2017_jml') + 
+                sumT(uci.baduta.booster.t1, 'bayi_lhr_hdp_2017_jml');
+
     const u22 = sumT(uci.baduta.booster.t2, 'bayi_lhr_hdp_2022_jml');
     const u23 = sumT(uci.baduta.booster.t3, 'bayi_lhr_hdp_2023_jml');
-    const u24 = sumT(uci.hb0_bcg.t1, 'bayi_lhr_hdp_2024_jml');
-    const u25 = sumT(uci.hb0_bcg.t2, 'bayi_lhr_hdp_2025_jml');
+    const u24 = sumT(uci.hb0_bcg.t1, 'bayi_lhr_hdp_2024_jml') +
+                sumT(uci.antigen.rv.t2, 'bayi_lhr_hdp_2024_jml') + 
+                sumT(uci.antigen.rotarix.t2, 'bayi_lhr_hdp_2024_jml') + 
+                sumT(uci.antigen.pcv.t2, 'bayi_lhr_hdp_2024_jml') + 
+                sumT(uci.antigen.je.t2, 'bayi_lhr_hdp_2024_jml') +
+                sumT(uci.antigen.heksavalen.t2, 'bayi_lhr_hdp_2024_jml') +
+                sumT(uci.tt.t1, 'caten_2024');
+    const u25 = sumT(uci.hb0_bcg.t2, 'bayi_lhr_hdp_2025_jml') +
+                sumT(uci.tt.t2, 'caten_2025');
 
     updateText('uci-2017', u17); updateText('uci-2022', u22); updateText('uci-2023', u23); updateText('uci-2024', u24); updateText('uci-2025', u25);
 
@@ -171,10 +195,26 @@ function processDataUCI(uci) {
         return total;
     };
     const sumT_Uci = (obj) => {
-        let total = 0; if (!obj) return 0;
-        Object.values(obj).forEach(arr => { if (Array.isArray(arr)) arr.forEach(d => { 
-            total += (Number(d.mati_L)||0) + (Number(d.mati_P)||0) + (Number(d.pindah_L)||0) + (Number(d.menolak_L)||0); 
-        }); });
+        let total = 0; 
+        if (!obj) return 0;
+
+        Object.values(obj).forEach(arr => { 
+            if (Array.isArray(arr)) {
+                arr.forEach(d => { 
+                    // Logika Fallback: Cek format '_-_' dulu, jika tidak ada pakai format standar
+                    const mati = (Number(d['mati_-_L']) || Number(d['mati_-']) || 0) + 
+                                (Number(d['mati_-_P']) || Number(d['bumil_mati_-']) || 0);
+                                
+                    const pindah = (Number(d['pindah_-_L']) || Number(d['bumil_pindah_-']) || 0) +
+                                (Number(d['pindah_-_P']) || Number(d['pindah_-']) || 0);
+                    
+                    const menolak = (Number(d['menolak_-_L']) || Number(d['bumil_menolak']) || Number(d['menolak_L']) || 0) + 
+                                    (Number(d['menolak_-_P']) || Number(d['menolak_p']) || Number(d['menolak_P']) || 0);
+
+                    total += (mati + pindah + menolak);
+                }); 
+            }
+        });
         return total;
     };
 
@@ -222,11 +262,22 @@ function updateBarChart(filterPusk) {
     });
 
     if (barChartInstance) {
+        // 1. Update Data
         barChartInstance.data.labels = labels;
         barChartInstance.data.datasets[0].data = dataBias;
         barChartInstance.data.datasets[1].data = dataUci;
+        
+        // 2. PAKSA Update Ukuran Font Sumbu X (Gunakan cara ini)
+        if (barChartInstance.options.scales.x) {
+            barChartInstance.options.scales.x.ticks.font = {
+                size: 8, // Ganti ke ukuran yang sangat kecil untuk tes (misal 8)
+                weight: 'normal'
+            };
+        }
+        
         barChartInstance.update();
     } else {
+        // Inisialisasi Pertama
         barChartInstance = new Chart(barEl, {
             type: 'bar',
             data: {
@@ -236,22 +287,154 @@ function updateBarChart(filterPusk) {
                     { label: 'Capaian UCI', data: dataUci, backgroundColor: '#64b5f6' }
                 ]
             },
-            options: { responsive: true, plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 10, weight: 'bold' } } }, scales: { y: { beginAtZero: true } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    x: {
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 90,
+                            minRotation: 90,
+                            font: { 
+                                size: 8, // Ukuran kecil di sini
+                                family: 'Arial' 
+                            }
+                        }
+                    },
+                    y: { beginAtZero: true } 
+                },
+                plugins: {
+                    datalabels: {
+                        // 'anchor: end' berarti titik acuan ada di ujung batang
+                        anchor: 'end', 
+                        // 'align: top' berarti posisi teks ada di atas titik acuan tersebut
+                        align: 'top', 
+                        // 'offset' memberikan jarak sedikit (pixel) agar tidak menempel garis batang
+                        offset: 2, 
+                        font: { 
+                            size: 6, 
+                        },
+                        formatter: (value) => value > 0 ? value : '' // Opsional: sembunyikan jika nol
+                    }
+                }
+            }
         });
     }
 }
 
 function updateScatterChart(filterPusk) {
-    const scatterEl = document.getElementById('scatterChart'); if (!scatterEl) return;
+    const scatterEl = document.getElementById('scatterChart'); 
+    if (!scatterEl) return;
+
+    // Ambil tahun dari UI. Jika 'all', kita default ke 2024 agar tidak overload
+    const yearUI = document.getElementById('yearSelector')?.value;
+    const selectedYear = (yearUI === 'all' || !yearUI) ? "2024" : yearUI;
+    
+    const uciSource = cachedData.program_imunisasi.uci;
+    const normPusk = normalizePuskesmasName(filterPusk);
+
+    // 1. Ambil list Puskesmas
     let labels = [...new Set(cachedData.program_imunisasi.bias.campak.map(d => d.Pukesmas || d.Puskesmas))];
-    if (filterPusk !== 'all') labels = labels.filter(p => normalizePuskesmasName(p) === normalizePuskesmasName(filterPusk));
-    const data = labels.map(n => ({
-        x: cachedData.program_imunisasi.bias.campak.filter(d=>normalizePuskesmasName(d.Pukesmas||d.Puskesmas)===normalizePuskesmasName(n)).reduce((a,b)=>a+(Number(b.imun_cmk_jml)||0),0),
-        y: cachedData.program_imunisasi.uci.baduta.booster["2023"].filter(d=>normalizePuskesmasName(d.Pukesmas||d.Puskesmas)===normalizePuskesmasName(n)).reduce((a,b)=>a+(Number(b.lengkap_jml)||0),0),
-        label: n
-    }));
-    if (scatterChartInstance) { scatterChartInstance.data.datasets[0].data = data; scatterChartInstance.update(); } 
-    else { scatterChartInstance = new Chart(scatterEl, { type: 'scatter', data: { datasets: [{ label: 'Puskesmas', data: data, backgroundColor: 'red' }] }, options: { layout: { padding: 80 }, plugins: { datalabels: { rotation: -90, align: 'end', anchor: 'end', formatter: (v)=>v.label } } } }); }
+    if (filterPusk !== 'all') labels = labels.filter(p => normalizePuskesmasName(p) === normPusk);
+
+    const data = labels.map(n => {
+        const normN = normalizePuskesmasName(n);
+
+        // SUMBU X: Imunisasi Campak (BIAS)
+        const valX = cachedData.program_imunisasi.bias.campak
+            .filter(d => normalizePuskesmasName(d.Pukesmas || d.Puskesmas) === normN)
+            .reduce((a, b) => a + (Number(b.imun_cmk_jml) || 0), 0);
+
+        // SUMBU Y: Total Capaian UCI (Harus Akumulatif agar tembus 1000)
+        let valY = 0;
+        
+        // A. Scan Semua Antigen
+        if (uciSource.antigen) {
+            Object.values(uciSource.antigen).forEach(antigenGroup => {
+                const yearData = antigenGroup[selectedYear] || [];
+                yearData.filter(d => normalizePuskesmasName(d.Pukesmas || d.Puskesmas) === normN)
+                        .forEach(d => {
+                            Object.keys(d).forEach(key => {
+                                // Ambil semua key capaian (rv_1_jml, pcv_1_jml, dll)
+                                if (key.includes('_jml') && !key.includes('bayi_lhr')) {
+                                    valY += (Number(d[key]) || 0);
+                                }
+                            });
+                        });
+            });
+        }
+
+        // B. Scan Baduta
+        (uciSource.baduta?.booster?.[selectedYear] || [])
+            .filter(d => normalizePuskesmasName(d.Pukesmas || d.Puskesmas) === normN)
+            .forEach(d => valY += (Number(d.lengkap_jml) || 0));
+
+        // C. Scan HB0_BCG
+        (uciSource.hb0_bcg?.[selectedYear] || [])
+            .filter(d => normalizePuskesmasName(d.Pukesmas || d.Puskesmas) === normN)
+            .forEach(d => valY += (Number(d.lengkap_jml) || 0));
+
+        return { x: valX, y: valY, label: n };
+    });
+
+    if (scatterChartInstance) { 
+        scatterChartInstance.data.datasets[0].data = data; 
+        scatterChartInstance.update(); 
+    } else { 
+        scatterChartInstance = new Chart(scatterEl, { 
+            type: 'scatter', 
+            data: { 
+                datasets: [{ 
+                    label: 'Puskesmas', 
+                    data: data, 
+                    backgroundColor: 'rgba(255, 61, 0, 0.7)',
+                    borderColor: '#bf360c',
+                    borderWidth: 1,
+                    pointRadius: 7
+                }] 
+            }, 
+            options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                // Kecilkan padding agar grafik lebih luas
+                layout: { 
+                    padding: { 
+                        top: 30, 
+                        right: 50, // Dikurangi dari 120 agar tidak terlalu kosong di kanan
+                        bottom: 10, 
+                        left: 10 
+                    } 
+                }, 
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Capaian BIAS (Campak)', font: { weight: 'bold' } },
+                        beginAtZero: true,
+                        // Hapus suggestedMax agar skala otomatis menyesuaikan data (Auto-fit)
+                    },
+                    y: {
+                        title: { display: true, text: 'Total Capaian UCI', font: { weight: 'bold' } },
+                        beginAtZero: true,
+                        // Hapus suggestedMax
+                    }
+                },
+                plugins: { 
+                    legend: { display: false },
+                    datalabels: { 
+                        // Gunakan 'offset' untuk menjauhkan teks dari titik tanpa perlu padding besar
+                        offset: 8,
+                        rotation: -45, 
+                        align: 'end', 
+                        anchor: 'end', 
+                        formatter: (v) => v.label,
+                        font: { size: 9 },
+                        // Matikan clip agar label yang di pinggir tetap terlihat
+                        clip: false 
+                    } 
+                } 
+            } 
+        }); 
+    }
 }
 
 function updateJKChart(l, p) {
@@ -260,10 +443,114 @@ function updateJKChart(l, p) {
     else { jkChartInstance = new Chart(jkEl, { type: 'doughnut', data: { labels: ['Perempuan', 'Laki-laki'], datasets: [{ data: [p, l], backgroundColor: ['#ec407a', '#42a5f5'] }] } }); }
 }
 
-function updateUsiaChart(resBias) {
-    const usiaEl = document.getElementById('usiaChart'); if (!usiaEl) return;
-    if (usiaChartInstance) { usiaChartInstance.data.datasets[0].data = resBias.detail_sasaran; usiaChartInstance.update(); } 
-    else { usiaChartInstance = new Chart(usiaEl, { type: 'doughnut', data: { labels: ['Kls 1', 'Kls 2', 'Kls 5', 'Kls 6', 'Kls 9'], datasets: [{ data: resBias.detail_sasaran, backgroundColor: ['#42a5f5', '#66bb6a', '#ffa726', '#ab47bc', '#ef5350'] }] } }); }
+function updateKelasChart(resBias) {
+    const usiaEl = document.getElementById('kelasChart'); if (!usiaEl) return;
+    if (kelasChartInstance) { kelasChartInstance.data.datasets[0].data = resBias.detail_sasaran; kelasChartInstance.update(); } 
+    else { kelasChartInstance = new Chart(usiaEl, { type: 'doughnut', data: { labels: ['Kls 1', 'Kls 2', 'Kls 5', 'Kls 6', 'Kls 9'], datasets: [{ data: resBias.detail_sasaran, backgroundColor: ['#42a5f5', '#66bb6a', '#ffa726', '#ab47bc', '#ef5350'] }] } }); }
+}
+
+/* ==================================================
+   FUNGSI: UPDATE DISTRIBUSI PUSKESMAS PER TAHUN (CODE 1)
+   Logika: Menampilkan tren 'lengkap_jml' berdasarkan sumbu X (Tahun)
+   ================================================== */
+/* ==================================================
+   FUNGSI: UPDATE DISTRIBUSI PER TAHUN (SELURUH UCI)
+   ================================================== */
+function updateDistribusiTahunChart(selectedPusk) {
+    const trendEl = document.getElementById('trendChart');
+    // Tambahkan pengambilan nilai selectedYear dari UI
+    const selectedYear = document.getElementById('yearSelector')?.value || 'all'; 
+    
+    if (!trendEl || !cachedData) return;
+
+    const allYears = ["2017", "2022", "2023", "2024", "2025"];
+    const normPusk = normalizePuskesmasName(selectedPusk);
+    const uciSource = cachedData.program_imunisasi.uci;
+
+    // LOGIKA FILTER TAHUN: 
+    // Jika 'all', tampilkan semua. Jika tahun spesifik, tampilkan tahun itu saja.
+    const listTahunTampil = (selectedYear === 'all') ? allYears : [selectedYear];
+
+    const getCapaianAllUCI = (year) => {
+        let totalYear = 0;
+
+        // 1. Scan Antigen dengan Key Spesifik (Agar data RV & Rotarix tidak tercampur)
+        const mappingKeys = {
+            rv: ['rv_1_jml', 'rv_2_jml', 'rv_3_jml'],
+            rotarix: ['rotarix_1_jml', 'rotarix_2_jml'],
+            pcv: ['pcv_1_jml', 'pcv_2_jml', 'pcv_3_jml'],
+            je: ['je_1_jml'],
+            heksavalen: ['heksavalen_1_jml', 'heksavalen_2_jml', 'heksavalen_3_jml']
+        };
+
+        if (uciSource.antigen) {
+            Object.entries(mappingKeys).forEach(([category, keys]) => {
+                const dataArray = uciSource.antigen[category]?.[year] || [];
+                dataArray.forEach(d => {
+                    const matchPusk = (selectedPusk === 'all' || normalizePuskesmasName(d.Pukesmas || d.Puskesmas || d.puskesmas) === normPusk);
+                    if (matchPusk) {
+                        keys.forEach(k => { totalYear += (Number(d[k]) || 0); });
+                    }
+                });
+            });
+        }
+
+        // 2. Scan Baduta
+        const badutaArray = uciSource.baduta?.booster?.[year] || [];
+        badutaArray.forEach(d => {
+            if (selectedPusk === 'all' || normalizePuskesmasName(d.Pukesmas || d.Puskesmas || d.puskesmas) === normPusk) {
+                totalYear += (Number(d.lengkap_jml) || 0);
+            }
+        });
+
+        // 3. Scan HB0_BCG
+        const hbArray = uciSource.hb0_bcg?.[year] || [];
+        hbArray.forEach(d => {
+            if (selectedPusk === 'all' || normalizePuskesmasName(d.Pukesmas || d.Puskesmas || d.puskesmas) === normPusk) {
+                totalYear += (Number(d.lengkap_jml) || 0);
+            }
+        });
+
+        // 4. Scan TT
+        const ttArray = uciSource.tt?.[year] || [];
+        ttArray.forEach(d => {
+            if (selectedPusk === 'all' || normalizePuskesmasName(d.Pukesmas || d.Puskesmas || d.puskesmas) === normPusk) {
+                totalYear += (Number(d.total) || 0);
+            }
+        });
+
+        return totalYear;
+    };
+
+    // Data di-map berdasarkan listTahunTampil (hasil filter tahun)
+    const dataPerTahun = listTahunTampil.map(year => getCapaianAllUCI(year));
+
+    // Update atau Buat Chart
+    if (tahunChartInstance) {
+        tahunChartInstance.data.labels = listTahunTampil;
+        tahunChartInstance.data.datasets[0].data = dataPerTahun;
+        // Opsional: Ubah warna jika hanya satu tahun agar lebih menarik
+        tahunChartInstance.data.datasets[0].backgroundColor = listTahunTampil.length === 1 ? '#ff7043' : '#42a5f5';
+        tahunChartInstance.update();
+    } else {
+        tahunChartInstance = new Chart(trendEl, {
+            type: 'bar',
+            data: {
+                labels: listTahunTampil,
+                datasets: [{
+                    label: 'Total Seluruh Capaian UCI',
+                    data: dataPerTahun,
+                    backgroundColor: '#42a5f5',
+                    borderColor: '#1e88e5',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
 }
 
 /* ==================================================
@@ -280,35 +567,6 @@ function populatePuskesmasFilter() {
 }
 
 document.addEventListener('DOMContentLoaded', fetchImunisasiData);
-
-    /* ================= TREND KERACUNAN ================= */
-    const trendEl = document.getElementById('trendChart');
-    if (trendEl) {
-        new Chart(trendEl, {
-            type: 'bar',
-            data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu'],
-                datasets: [
-                    {
-                        label: 'MBG',
-                        data: [11, 50, 144, 116, 396, 986, 545, 270],
-                        backgroundColor: '#42a5f5'
-                    },
-                    {
-                        label: 'Non MBG',
-                        data: [0, 170, 189, 116, 111, 157, 39, 42],
-                        backgroundColor: '#ef5350'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-    }
 
     /* ================= DISTRIBUSI PUSKESMAS PAGE ================= */
     const faktor = document.getElementById('envFaktorRisikoChart');
