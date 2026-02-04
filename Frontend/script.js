@@ -1,12 +1,17 @@
 /* ==================================================
    1. GLOBAL VARIABLES & CHART INSTANCES
    ================================================== */
-let cachedData = null;
+// FITUR DASHBOARD VARIABEL
+   let cachedData = null;
 let scatterChartInstance = null;
 let kelasChartInstance = null;
 let jkChartInstance = null;
 let barChartInstance = null;
 let tahunChartInstance = null; // Menambahkan instance untuk trend tahunan
+
+// FITUR DISTRIBUSI VARIABEL
+let alasanChartInstance = null;
+
 
 if (typeof ChartDataLabels !== 'undefined') {
     Chart.register(ChartDataLabels);
@@ -123,6 +128,7 @@ function handleFilterChange() {
     updateKelasChart(resBias);
     updateJKChart(resBias.jk.L + resUci.jk.L, resBias.jk.P + resUci.jk.P);
     updateDistribusiTahunChart(selectedPuskesmas);
+    updateAlasanChart(filteredBias);
 }
 
 /* ==================================================
@@ -554,6 +560,153 @@ function updateDistribusiTahunChart(selectedPusk) {
 }
 
 /* ==================================================
+   FUNGSI: UPDATE GRAFIK ALASAN SISWA TIDAK IMUNISASI
+   ================================================== */
+   
+function updateAlasanChart(bias) {
+    const canvas = document.getElementById('pemeriksaanChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // 1. Label Sumbu Y - Menggunakan Array di dalam Array untuk 2 Baris
+    const labelsAlasan = [
+        'Sakit',
+        ['Tidak Boleh', '(Alasan Agama)'],
+        ['Tidak Boleh', '(Alasan Lain)'],
+        'Tidak Masuk',
+        ['Sudah Imunisasi', 'MMR 2 kl'],
+        ['Sudah Imunisasi', 'DT Sebelumnya'],
+        ['Sudah Imunisasi', 'TD Sebelumnya'],
+        'Tidak Naik Kelas'
+    ];
+
+    /**
+     * 2. Fungsi Internal: sumAlasan (Logika sumS/sumT)
+     * Menjumlahkan nilai dari daftar keys yang diberikan
+     */
+    const sumAlasan = (targetArray, keys) => {
+        let total = 0;
+        if (!targetArray || targetArray.length === 0) return 0;
+        
+        targetArray.forEach(d => {
+            keys.forEach(key => {
+                // Menjumlahkan nilai jika key ditemukan dalam objek d
+                total += (Number(d[key]) || 0);
+            });
+        });
+        return total;
+    };
+
+    /**
+     * 3. Fungsi Internal: getDataAlasan
+     * Memetakan data dari satu kategori imunisasi ke 8 baris alasan
+     */
+    const getDataAlasan = (targetArray) => {
+        return [
+            // Sakit
+            sumAlasan(targetArray, ['tdk_imun_skt', 'tdk_imun_skt_kls_2', 'tdk_imun_skt_kls_5', 'hpv_tdk_imun_skt_kls_5', 'hpv_tdk_imun_skt_kls_6', 'hpv_tdk_imun_skt_kls_9']),
+            
+            // Tidak Boleh Agama
+            sumAlasan(targetArray, ['tdk_blk_agm', 'tdk_blk_agm_kls_2', 'tdk_blk_agm_kls_5', 'hpv_tdk_imun_agm_kls_5', 'hpv_tdk_imun_agm_kls_6', 'hpv_tdk_imun_agm_kls_9']),
+            
+            // Tidak Boleh Alasan Lain
+            sumAlasan(targetArray, ['tdk_blk_alsn_ln', 'tdk_blk_alsn_ln_kls_2', 'tdk_blk_alsn_ln_kls_5', 'hpv_tdk_blk_alsn_ln_kls_5', 'hpv_tdk_blk_alsn_ln_kls_6', 'hpv_tdk_blk_alsn_ln_kls_9']),
+            
+            // Tidak Masuk
+            sumAlasan(targetArray, ['tm', 'tm_kls_2', 'tm_kls_5', 'hpv_tm_kls_5', 'hpv_tm_kls_6', 'hpv_tm_kls_9']),
+            
+            // Sudah Imunisasi MMR/Campak
+            sumAlasan(targetArray, ['sdh_imun_mmr_2kl']),
+            
+            // Sudah Imunisasi DT
+            sumAlasan(targetArray, ['sdh_imun_dt']),
+            
+            // Sudah Imunisasi TD
+            sumAlasan(targetArray, ['sdh_imun_td_kls_2', 'sdh_imun_td_kls_5']),
+            
+            // Tidak Naik Kelas
+            sumAlasan(targetArray, ['tdk_nk_kls_cmk', 'tdk_nk_kls_dt', 'tdk_nk_kls_td_kls_2', 'tdk_nk_kls_td_kls_5', 'tdk_nk_kls_hpv_kls_5'])
+        ];
+    };
+
+    // 4. Konfigurasi Datasets untuk Chart.js
+    const dataSets = [
+        {
+            label: 'Campak',
+            data: getDataAlasan(bias.campak),
+            backgroundColor: '#FF7043',
+        },
+        {
+            label: 'DT',
+            data: getDataAlasan(bias.dt),
+            backgroundColor: '#42A5F5',
+        },
+        {
+            label: 'TD',
+            data: getDataAlasan(bias.td),
+            backgroundColor: '#66BB6A',
+        },
+        {
+            label: 'HPV',
+            data: getDataAlasan([
+                ...(bias.hpv?.kelas?.kelas_5 || []),
+                ...(bias.hpv?.kelas?.kelas_6 || []),
+                ...(bias.hpv?.kelas?.kelas_9 || [])
+            ]),
+            backgroundColor: '#AB47BC',
+        }
+    ];
+
+    // 4. Logika Update atau Create Chart (Mencegah Duplikasi)
+    if (alasanChartInstance) {
+        // Jika chart sudah ada, cukup update datanya
+        alasanChartInstance.data.datasets = dataSets;
+        alasanChartInstance.update();
+    } else {
+        // Jika chart belum ada, buat baru
+        alasanChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labelsAlasan,
+                datasets: dataSets
+            },
+            options: {
+                indexAxis: 'y', // Baris horizontal
+                responsive: true,
+                maintainAspectRatio: false, // Tinggi mengikuti container
+                plugins: {
+                    legend: { 
+                        position: 'top',
+                        labels: { font: { weight: 'bold' } }
+                    },
+                    title: { display: false }, // Judul ditiadakan sesuai permintaan
+                    datalabels: {
+                        color: '#fff',
+                        anchor: 'center',
+                        align: 'center',
+                        font: { weight: 'bold', size: 10 },
+                        formatter: (value) => value > 0 ? value : '' // Sembunyikan jika nol
+                    }
+                },
+                scales: {
+                    x: { 
+                        stacked: true,
+                        title: { display: true, text: 'Jumlah Siswa' }
+                    },
+                    y: { 
+                        stacked: true,
+                        ticks: {
+                            autoSkip: false,
+                            font: { size: 11 }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+/* ==================================================
    7. UI HELPERS & FILTER POPULATION
    ================================================== */
 function updateText(id, val) { const el = document.getElementById(id); if (el) el.innerText = (id.includes('persen') ? val : (Number(val) || 0).toLocaleString('id-ID')); }
@@ -565,6 +718,8 @@ function populatePuskesmasFilter() {
     cachedData.program_imunisasi.bias.campak.forEach(d => puskSet.add(d.Pukesmas || d.Puskesmas));
     [...puskSet].filter(Boolean).sort().forEach(p => selector.add(new Option(p, p)));
 }
+
+
 
 document.addEventListener('DOMContentLoaded', fetchImunisasiData);
 
@@ -627,6 +782,17 @@ document.addEventListener('DOMContentLoaded', fetchImunisasiData);
         });
     }
 
+function goTo(url) {
+    window.location.href = url;
+}
+    
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+
+    sidebar.classList.toggle('collapsed');
+}
+
 /* ================= PAGE NAVIGATION ================= */
 function changePage(pageId, el) {
     document.querySelectorAll('.page').forEach(p => {
@@ -644,3 +810,69 @@ function changePage(pageId, el) {
 
     if (el) el.classList.add('active');
 }
+
+    // const ctx = document.getElementById('myChart').getContext('2d');
+
+// Registrasi plugin agar angka tampil di dalam bar
+// Chart.register(ChartDataLabels);
+
+// const ctx = document.getElementById('pemeriksaanChart').getContext('2d');
+
+// const labels = [
+//     'Escherichia coli', 'coliform', 'Staphylococcus sp', 
+//     'Salmonella sp', 'Baccilus cereus', 'Histamin', 
+//     'Nitrat/Nitrit', 'Vibrio Cholera', 'Shigella', 
+//     'Pseudomonas sp', 'Clostridium Pefringens'
+// ];
+
+// const data = {
+//     labels: labels,
+//     datasets: [
+//         {
+//             label: 'tidak diperiksa',
+//             data: [7, 8, 12, 10, 12, 24, 21, 24, 22, 22, 20],
+//             backgroundColor: '#A9A9A9',
+//         },
+//         {
+//             label: 'negatif',
+//             data: [6, 7, 7, 10, 8, 2, 4, 2, 4, 4, 4],
+//             backgroundColor: '#81D4FA',
+//         },
+//         {
+//             label: 'positif',
+//             data: [14, 11, 7, 6, 6, 0, 1, 0, 0, 0, 1],
+//             backgroundColor: '#B71C1C',
+//         }
+//     ]
+// };
+
+// const config = {
+//     type: 'bar',
+//     data: data, // Gunakan variabel data Anda sebelumnya
+//     options: {
+//         indexAxis: 'y', 
+//         responsive: true,
+//         /* WAJIB FALSE: Jika TRUE, chart akan mengabaikan tinggi 800px 
+//            dan kembali menjadi gepeng */
+//         maintainAspectRatio: false, 
+//         devicePixelRatio: 2, 
+//         plugins: {
+//             legend: { position: 'top' },
+//             title: { display: false } // Judul sudah ada di <h4> HTML
+//         },
+//         scales: {
+//             x: { stacked: true },
+//             y: { 
+//                 stacked: true,
+//                 ticks: {
+//                     autoSkip: false, // Tampilkan semua nama bakteri
+//                     font: { size: 12 }
+//                 }
+//             }
+//         }
+//     }
+// };
+
+// // Inisialisasi Chart
+// new Chart(ctx, config);
+

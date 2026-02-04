@@ -7,6 +7,7 @@
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
     <!-- Style utama (SAMA dengan index.html) -->
     <link rel="stylesheet" href="style.css">
@@ -18,14 +19,14 @@
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <h3>DAMPALIN</h3>
+            <h3>📊 DAMPALIN</h3>
             <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
         </div>
 
         <ul class="menu">
             <li onclick="goTo('index.html')">Dashboard Utama</li>
             <li class="active">Distribusi Puskesmas</li>
-            <li onclick="goTo('index.html#trend')">Tabel
+            <li onclick="goTo('index.html#trend')">Tabel </li>
         </ul>
     </aside>
 
@@ -34,15 +35,30 @@
 
         <!-- HEADER -->
         <header class="header">
-            <h2>
-                DISTRIBUSI PUSKESMAS<br>
-                KABUPATEN SLEMAN
-            </h2>
+            <div class="brand-group">
+                <img class="img-lambang-sleman" src="Lambang_Kabupaten_Sleman.png">
+                <h2 class="distribusi-puskesmas">DISTRIBUSI PUSKESMAS KABUPATEN SLEMAN</h2>
+            </div>
 
             <div class="filter">
-                <select><option>Tahun Kejadian</option></select>
-                <select><option>Puskesmas</option></select>
-                <select><option>Kategori</option></select>
+                <select id="yearSelector" onchange="handleFilterChange()">
+                    <option value="all">Semua Tahun</option>
+                    <option value="2025">2025</option>
+                    <option value="2024">2024</option>
+                    <option value="2023">2023</option>
+                    <option value="2022">2022</option>
+                    <option value="2017">2017</option>
+                </select>
+
+                <select id="puskesmasSelector" onchange="handleFilterChange()">
+                     <option value="all">Semua Puskesmas</option>
+                </select>
+                
+                <select id="kategoriSelector" onchange="handleCategoryChange()">
+                    <option value="semua">Semua Kategori</option>
+                    <option value="bias">Kategori BIAS</option>
+                    <option value="uci">Kategori UCI</option>
+                </select>
             </div>
         </header>
 
@@ -55,6 +71,21 @@
 
                     <div class="card chart">
                         <h4>Jumlah Logistik Imunisasi Campak</h4>
+                        <canvas id="envFaktorRisikoChart"></canvas>
+                    </div>
+
+                    <div class="card chart">
+                        <h4>Jumlah Logistik Imunisasi DT</h4>
+                        <canvas id="envFaktorRisikoChart"></canvas>
+                    </div>
+
+                    <div class="card chart">
+                        <h4>Jumlah Logistik Imunisasi TD</h4>
+                        <canvas id="envFaktorRisikoChart"></canvas>
+                    </div>
+
+                    <div class="card chart">
+                        <h4>Jumlah Logistik Imunisasi HPV</h4>
                         <canvas id="envFaktorRisikoChart"></canvas>
                     </div>
 
@@ -74,9 +105,9 @@
 
                 <!-- RIGHT -->
                 <div class="right">
-                    <div class="card chart">
-                        <h4>Hasil Pemeriksaan Laboratorium</h4>
-                        <canvas id="envLabChart"></canvas>
+                    <div class="card chart" id="container-pemeriksaan">
+                        <h4>Alasan Siswa Tidak Imunisasi</h4>
+                        <canvas id="pemeriksaanChart"></canvas>
                     </div>
                 </div>
 
@@ -85,85 +116,7 @@
 
     </main>
 </div>
-
 <script src="script.js"></script>
-
-<script>
-/* ================= CHARTS ================= */
-
-// Faktor Risiko
-new Chart(document.getElementById('envFaktorRisikoChart'), {
-    type: 'bar',
-    data: {
-        labels: ['Tidak Memakai APD', 'Kebersihan Rendah', 'Air Tidak Layak'],
-        datasets: [{
-            label: 'Jumlah',
-            data: [120, 90, 60],
-            backgroundColor: '#90caf9'
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: { beginAtZero: true }
-        }
-    }
-});
-
-// Pelatihan
-new Chart(document.getElementById('envPelatihanChart'), {
-    type: 'pie',
-    data: {
-        labels: ['Sudah', 'Belum'],
-        datasets: [{
-            data: [75, 25],
-            backgroundColor: ['#66bb6a', '#ef5350']
-        }]
-    },
-    options: {
-        responsive: true
-    }
-});
-
-// Spesimen
-new Chart(document.getElementById('envSpesimenChart'), {
-    type: 'doughnut',
-    data: {
-        labels: ['Memenuhi Syarat', 'Tidak Memenuhi'],
-        datasets: [{
-            data: [68, 32],
-            backgroundColor: ['#42a5f5', '#ff7043']
-        }]
-    },
-    options: {
-        responsive: true
-    }
-});
-
-// Lab
-new Chart(document.getElementById('envLabChart'), {
-    type: 'bar',
-    data: {
-        labels: ['E.coli', 'Salmonella', 'Coliform'],
-        datasets: [{
-            label: 'Jumlah Sampel',
-            data: [40, 22, 15],
-            backgroundColor: '#ab47bc'
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: { beginAtZero: true }
-        }
-    }
-});
-
-// Navigasi
-function goTo(page) {
-    window.location.href = page;
-}
-</script>
 
 </body>
 </html>

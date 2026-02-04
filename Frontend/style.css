@@ -99,9 +99,77 @@ body {
     border-radius: 12px;
 }
 
-.header h2 {
+.header .img-lambang-sleman {
+    height: 60px;
+    width: 50px;
+}
+
+/* Container khusus agar logo dan teks nempel */
+.title-wrapper {
+    display: flex;
+    align-items: center; /* Sejajar vertikal */
+    gap: 15px;           /* Jarak relatif antara logo dan teks */
+    flex: 1;             /* Opsional: agar wrapper mengambil ruang yang tersedia */
+}
+
+/* Menghilangkan margin bawaan yang membuat jarak jauh */
+.title-wrapper .img-lambang-sleman {
+    height: 60px; /* Sesuaikan ukuran */
+    width: auto;
+    margin: 0;
+}
+
+.title-wrapper h2.dashboard-title {
+    margin: 0;           /* Hapus jarak atas/bawah/kiri h2 */
+    font-size: 16px;     /* Sesuaikan ukuran font */
+    line-height: 1.3;    /* Mengatur jarak antar baris teks agar tidak terlalu renggang */
+    text-align: left;
+}
+
+/* Khusus untuk merapatkan logo dan judul */
+.brand-group {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Ini akan merapatkan mereka secara relatif */
+}
+
+/* Pastikan tidak ada margin bawaan yang mengganggu */
+.brand-group .img-lambang-sleman {
+    height: 60px;
+    width: auto;
+    margin: 0; 
+}
+
+.brand-group h2.distribusi-puskesmas {
+    margin: 0;
     font-size: 18px;
-    line-height: 1.4;
+    line-height: 1.2;
+}
+
+/* ================= BRAND & DASHBOARD (Spesifik) ================= */
+.brand-wrapper {
+    display: flex;
+    align-items: center;
+    /* Jarak relatif antara logo dan teks */
+    gap: 15px; 
+    flex: 1;
+}
+
+.brand-wrapper .img-lambang-sleman {
+    /* Ukuran responsif menggunakan clamp */
+    height: clamp(40px, 6vw, 60px); 
+    width: auto;
+    margin: 0;
+}
+
+.brand-wrapper h2.dashboard-title {
+    margin: 0;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #333;
+    /* Font akan mengecil otomatis: min 0.8rem, ideal 1.5vw, max 1.1rem */
+    font-size: clamp(0.8rem, 1.5vw, 1.1rem);
+    text-align: left;
 }
 
 /* Filter */
@@ -138,6 +206,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    height: auto;
 }
 
 /* ================= CARD ================= */
@@ -191,6 +260,27 @@ body {
     height: 240px !important;
 }
 
+
+
+
+
+/* Hanya untuk container chart pemeriksaan */
+
+
+/* Tampilan untuk Laptop/PC */
+@media screen and (min-width: 1024px) {
+    #pemeriksaanChart {
+        /* Paksa tinggi agar memanjang ke bawah dan tidak gepeng */
+        height: 800px !important; 
+        width: 100% !important;
+    }
+
+    /* Atur juga container induknya agar tidak membatasi canvas */
+    #container-pemeriksaan {
+        height: auto !important;
+        min-height: 850px;
+    }
+}
 /* ================= RESPONSIVE ================= */
 @media (max-width: 1024px) {
     .content {
@@ -217,11 +307,30 @@ body {
         gap: 10px;
     }
 
+    div.brand-wrapper h2.dashboard-title {
+        font-size: 14px !important; /* Paksa ukuran mengecil di layar kecil */
+    }
+    
+    .brand-wrapper .img-lambang-sleman {
+        height: 45px; /* Kecilkan juga logonya */
+    }
+
     .filter {
         width: 100%;
         justify-content: space-between;
     }
     .summary-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .brand-wrapper {
+        gap: 8px; /* Lebih rapat lagi di HP */
+    }
+    
+    .brand-wrapper h2.dashboard-title br {
+        /* Opsional: hilangkan baris baru di HP agar teks memanjang jika perlu */
+        display: block; 
     }
 }
