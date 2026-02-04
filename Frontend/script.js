@@ -446,7 +446,7 @@ function updateJKChart(l, p) {
 function updateKelasChart(resBias) {
     const usiaEl = document.getElementById('kelasChart'); if (!usiaEl) return;
     if (kelasChartInstance) { kelasChartInstance.data.datasets[0].data = resBias.detail_sasaran; kelasChartInstance.update(); } 
-    else { kelasChartInstance = new Chart(usiaEl, { type: 'doughnut', data: { labels: ['Kls 1', 'Kls 2', 'Kls 5', 'Kls 6', 'Kls 9'], datasets: [{ data: resBias.detail_sasaran, backgroundColor: ['#42a5f5', '#66bb6a', '#ffa726', '#ab47bc', '#ef5350'] }] } }); }
+    else { kelasChartInstance = new Chart(usiaEl, { type: 'doughnut', data: { labels: ['Kelas 1', 'Kelas 2', 'Kelas 5', 'Kelas 6', 'Kelas 9'], datasets: [{ data: resBias.detail_sasaran, backgroundColor: ['#42a5f5', '#66bb6a', '#ffa726', '#ab47bc', '#ef5350'] }] } }); }
 }
 
 /* ==================================================
