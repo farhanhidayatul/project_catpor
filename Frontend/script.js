@@ -1,19 +1,32 @@
-// ==================================================
-// 1. GLOBAL CACHE & CHART INSTANCE
-// ==================================================
+/* ==================================================
+   1. GLOBAL VARIABLES & CHART INSTANCES
+   ================================================== */
 let cachedData = null;
 let scatterChartInstance = null;
+let usiaChartInstance = null;
+let jkChartInstance = null;
+let barChartInstance = null;
 
-// Registrasi plugin secara manual untuk memastikan ChartDataLabels terdeteksi
 if (typeof ChartDataLabels !== 'undefined') {
     Chart.register(ChartDataLabels);
-} else {
-    console.error("Peringatan: Plugin ChartDataLabels tidak ditemukan. Pastikan script CDN sudah terpasang di HTML.");
 }
 
-// ==================================================
-// 2. DATA FETCH & INITIALIZATION
-// ==================================================
+/* ==================================================
+   2. NORMALIZATION HELPER (MENGATASI BEDA PENULISAN)
+   ================================================== */
+function normalizePuskesmasName(name) {
+    if (!name) return "";
+    let n = name.toString().toUpperCase().trim();
+    // Menyelaraskan angka romawi ke angka biasa (I -> 1, II -> 2, III -> 3)
+    n = n.replace(/\sI$/, " 1").replace(/\sII$/, " 2").replace(/\sIII$/, " 3");
+    // Menghapus kata PUSKESMAS/PUKESMAS di depan agar sisa namanya saja yang dibandingkan
+    n = n.replace(/^PUSKESMAS\s|^PUKESMAS\s/, "");
+    return n;
+}
+
+/* ==================================================
+   3. DATA FETCH & INITIALIZATION
+   ================================================== */
 async function fetchImunisasiData() {
     try {
         const response = await fetch('data_imunisasi_terbaru.json');
@@ -21,25 +34,29 @@ async function fetchImunisasiData() {
         populatePuskesmasFilter();
         handleFilterChange();
     } catch (error) {
-        console.error("Gagal memuat data:", error);
+        console.error("Gagal memuat data JSON:", error);
     }
 }
 
-// ==================================================
-// 3. FILTER HANDLER (KONFIGURASI LENGKAP)
-// ==================================================
+/* ==================================================
+   4. FILTER HANDLER (SINKRONISASI TOTAL)
+   ================================================== */
 function handleFilterChange() {
     if (!cachedData) return;
 
     const selectedPuskesmas = document.getElementById('puskesmasSelector').value;
+    const normalizedSelected = normalizePuskesmasName(selectedPuskesmas);
     const biasSource = cachedData.program_imunisasi.bias;
     const uciSource = cachedData.program_imunisasi.uci;
 
+    // Filter array dengan dukungan key Pukesmas/Puskesmas/puskesmas
     const filterArray = (arr) => (arr || []).filter(d => {
-        const pusk = d.Pukesmas || d.Puskesmas || d.puskesmas;
-        return selectedPuskesmas === 'all' || pusk === selectedPuskesmas;
+        if (selectedPuskesmas === 'all') return true;
+        const rawName = d.Pukesmas || d.Puskesmas || d.puskesmas || "";
+        return normalizePuskesmasName(rawName) === normalizedSelected;
     });
 
+    // --- PROSES DATA BIAS ---
     let filteredBias = {
         campak: filterArray(biasSource.campak),
         dt:     filterArray(biasSource.dt),
@@ -53,19 +70,20 @@ function handleFilterChange() {
         }
     };
 
+    // --- PROSES DATA UCI ---
     let filteredUci = {
         antigen: {
-            rv:         { t1: filterArray(uciSource.antigen?.rv?.["2017"]), t2: filterArray(uciSource.antigen?.rv?.["2024"]) },
-            rotarix:    { t1: filterArray(uciSource.antigen?.rotarix?.["2017"]), t2: filterArray(uciSource.antigen?.rotarix?.["2024"]) },
-            pcv:        { t1: filterArray(uciSource.antigen?.pcv?.["2017"]), t2: filterArray(uciSource.antigen?.pcv?.["2024"]) },
-            je:         { t1: filterArray(uciSource.antigen?.je?.["2017"]), t2: filterArray(uciSource.antigen?.je?.["2024"]) },
+            rv: { t1: filterArray(uciSource.antigen?.rv?.["2017"]), t2: filterArray(uciSource.antigen?.rv?.["2024"]) },
+            rotarix: { t1: filterArray(uciSource.antigen?.rotarix?.["2017"]), t2: filterArray(uciSource.antigen?.rotarix?.["2024"]) },
+            pcv: { t1: filterArray(uciSource.antigen?.pcv?.["2017"]), t2: filterArray(uciSource.antigen?.pcv?.["2024"]) },
+            je: { t1: filterArray(uciSource.antigen?.je?.["2017"]), t2: filterArray(uciSource.antigen?.je?.["2024"]) },
             heksavalen: { t1: filterArray(uciSource.antigen?.heksavalen?.["2017"]), t2: filterArray(uciSource.antigen?.heksavalen?.["2024"]) }
         },
         baduta: {
-            booster: {
-                t1: filterArray(uciSource.baduta?.booster?.["2017"]),
-                t2: filterArray(uciSource.baduta?.booster?.["2022"]),
-                t3: filterArray(uciSource.baduta?.booster?.["2023"])
+            booster: { 
+                t1: filterArray(uciSource.baduta?.booster?.["2017"]), 
+                t2: filterArray(uciSource.baduta?.booster?.["2022"]), 
+                t3: filterArray(uciSource.baduta?.booster?.["2023"]) 
             }
         },
         hb0_bcg: { t1: filterArray(uciSource.hb0_bcg?.["2024"]), t2: filterArray(uciSource.hb0_bcg?.["2025"]) },
@@ -75,294 +93,193 @@ function handleFilterChange() {
     const resBias = processDataBIAS(filteredBias);
     const resUci = processDataUCI(filteredUci);
 
-    // --- UPDATE CARD STATISTIK ---
-    const totalSemuaS = (resBias.total_s || 0) + (resUci.total_s || 0);
-    const totalSemuaT = (resBias.total_t || 0) + (resUci.total_t || 0);
-    updateText('total-semua-s', totalSemuaS);
-    updateText('total-semua-t', totalSemuaT);
-
-    const totalSasaran = (resBias.sasaran_bias || 0) + (resUci.sasaran_uci || 0);
-    updateText('total-semua-sasaran', totalSasaran);
-
-    let persentase = totalSasaran > 0 ? (totalSemuaS / totalSasaran) * 100 : 0;
-    const elPersen = document.getElementById('total-semua-persen');
-    if (elPersen) {
-        elPersen.innerText = persentase.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // --- HITUNG FITUR PERSENTASE (%) CARD PINK ---
+    const totalS_Gabungan = resBias.total_s + resUci.total_s;
+    const totalSasaran_Gabungan = resBias.sasaran_bias + resUci.sasaran_uci;
+    let totalPersen = 0;
+    if (totalSasaran_Gabungan > 0) {
+        totalPersen = (totalS_Gabungan / totalSasaran_Gabungan) * 100;
     }
 
-    // --- UPDATE SCATTER CHART ---
+    // Update UI Header & Card Pink
+    updateText('total-semua-s', totalS_Gabungan);
+    updateText('total-semua-t', resBias.total_t + resUci.total_t);
+    updateText('total-semua-sasaran', totalSasaran_Gabungan);
+    updateText('total-semua-persen', totalPersen.toFixed(1) + "%");
+
+    // Refresh Grafik
+    updateBarChart(selectedPuskesmas);
     updateScatterChart(selectedPuskesmas);
+    updateUsiaChart(resBias);
+    updateJKChart(resBias.jk.L + resUci.jk.L, resBias.jk.P + resUci.jk.P);
 }
 
-// ==================================================
-// 4. PROCESSOR BIAS (TIDAK BERUBAH)
-// ==================================================
+/* ==================================================
+   5. DATA PROCESSORS (BIAS & UCI)
+   ================================================== */
 function processDataBIAS(bias) {
-    const sumTotal = (arr, key) => (arr || []).reduce((a, b) => a + (Number(b[key]) || 0), 0);
+    const sumT = (arr, key) => (arr || []).reduce((a, b) => a + (Number(b[key]) || 0), 0);
     
-    const s1 = sumTotal(bias.campak, "kls_1_mrd_br_jml") + sumTotal(bias.campak, "tdk_nk_kls_cmk");
-    const s2 = sumTotal(bias.td, 'kls_2_mrd_br_jml') + sumTotal(bias.td, 'tdk_nk_kls_td_kls_2');
-    const s5 = sumTotal(bias.td, 'kls_5_mrd_L') + sumTotal(bias.td, 'tdk_nk_kls_td_kls_5') + sumTotal(bias.hpv.kelas.kelas_5, 'ssrn_P_kls_5');
-    const s6 = sumTotal(bias.hpv.kelas.kelas_6, 'ssrn_P_kls_6');
-    const s9 = sumTotal(bias.hpv.kelas.kelas_9, 'ssrn_P_kls_9');
+    // Sasaran Per Kelas
+    const s1 = sumT(bias.campak, "kls_1_mrd_br_jml") + sumT(bias.campak, "tdk_nk_kls_cmk");
+    const s2 = sumT(bias.td, 'kls_2_mrd_br_jml') + sumT(bias.td, 'tdk_nk_kls_td_kls_2');
+    const s5 = sumT(bias.td, 'kls_5_mrd_L') + sumT(bias.td, 'tdk_nk_kls_td_kls_5') + sumT(bias.hpv.kelas.kelas_5, 'ssrn_P_kls_5');
+    const s6 = sumT(bias.hpv.kelas.kelas_6, 'ssrn_P_kls_6');
+    const s9 = sumT(bias.hpv.kelas.kelas_9, 'ssrn_P_kls_9');
 
-    updateText('bias-kelas-1', s1);
-    updateText('bias-kelas-2', s2);
-    updateText('bias-kelas-5', s5);
-    updateText('bias-kelas-6', s6);
-    updateText('bias-kelas-9', s9);
+    updateText('bias-kelas-1', s1); updateText('bias-kelas-2', s2); 
+    updateText('bias-kelas-5', s5); updateText('bias-kelas-6', s6); updateText('bias-kelas-9', s9);
 
-    const campak_s = sumTotal(bias.campak, 'imun_cmk_jml');
-    const campak_t = sumTotal(bias.campak, 'ttl_abs_cmk');
-    const dt_s = sumTotal(bias.dt, 'dt_imun_jml');
-    const dt_t = sumTotal(bias.dt, 'ttl_abs_dt');
-    const td_s = sumTotal(bias.dt, 'imun_td_jml') + 
-                 bias.td.reduce((a, b) => a + (Number(b.td_imun_jml_kls_2) || 0) + (Number(b.imun_td_jml_kls_5) || 0), 0);
-    const td_t = sumTotal(bias.dt, 'ttl_abs_td') + 
-                 bias.td.reduce((a, b) => a + (Number(b.ttl_abs_td_kls_2) || 0) + (Number(b.ttl_abs_td_kls_5) || 0), 0);
+    const c_s = sumT(bias.campak, 'imun_cmk_jml');
+    const c_t = sumT(bias.campak, 'ttl_abs_cmk');
+    const dt_s = sumT(bias.dt, 'dt_imun_jml');
+    const dt_t = sumT(bias.dt, 'ttl_abs_dt');
+    const td_s = sumT(bias.td, 'td_imun_jml_kls_2') + sumT(bias.td, 'imun_td_jml_kls_5');
+    const td_t = sumT(bias.td, 'ttl_abs_td_kls_2') + sumT(bias.td, 'ttl_abs_td_kls_5');
+    const hpv_s = sumT(bias.hpv.kelas.kelas_5, 'hpv_ttl_kls_5') + sumT(bias.hpv.kelas.kelas_6, 'hpv_ttl_kls_6') + sumT(bias.hpv.kelas.kelas_9, 'hpv_ttl_kls_9');
+    const hpv_t = sumT(bias.hpv.kelas.kelas_5, 'hpv_ttl_abs_kls_5') + sumT(bias.hpv.kelas.kelas_6, 'hpv_ttl_abs_kls_6') + sumT(bias.hpv.kelas.kelas_9, 'hpv_ttl_abs_kls_9');
 
-    const hpv_s = sumTotal(bias.hpv.kelas.kelas_5, 'hpv_ttl_kls_5') + sumTotal(bias.hpv.kelas.kelas_6, 'hpv_ttl_kls_6') + sumTotal(bias.hpv.kelas.kelas_9, 'hpv_ttl_kls_9');
-    const hpv_t = sumTotal(bias.hpv.kelas.kelas_5, 'hpv_ttl_abs_kls_5') + sumTotal(bias.hpv.kelas.kelas_6, 'hpv_ttl_abs_kls_6') + sumTotal(bias.hpv.kelas.kelas_9, 'hpv_ttl_abs_kls_9');
-
-    updateCard('campak', campak_s, campak_t);
-    updateCard('dt', dt_s, dt_t);
-    updateCard('td', td_s, td_t);
-    updateCard('hpv', hpv_s, hpv_t);
+    updateCard('campak', c_s, c_t); updateCard('dt', dt_s, dt_t); updateCard('td', td_s, td_t); updateCard('hpv', hpv_s, hpv_t);
 
     return { 
-        total_s: campak_s + dt_s + td_s + hpv_s, 
-        total_t: campak_t + dt_t + td_t + hpv_t,
-        sasaran_bias: s1 + s2 + s5 + s6 + s9
+        total_s: c_s + dt_s + td_s + hpv_s, 
+        total_t: c_t + dt_t + td_t + hpv_t,
+        sasaran_bias: s1 + s2 + s5 + s6 + s9, 
+        detail_sasaran: [s1, s2, s5, s6, s9],
+        jk: { 
+            L: sumT(bias.campak, 'imun_cmk_L') + sumT(bias.dt, 'dt_imun_L') + sumT(bias.td, 'td_imun_L_kls_2'),
+            P: sumT(bias.campak, 'imun_cmk_P') + sumT(bias.dt, 'dt_imun_P') + hpv_s 
+        }
     };
 }
 
-// ==================================================
-// 5. PROCESSOR UCI (TIDAK BERUBAH)
-// ==================================================
 function processDataUCI(uci) {
-    const sumS = (antigenObj, keys) => {
-        let t = 0; if (!antigenObj) return 0;
-        Object.values(antigenObj).forEach(arr => {
-            if (Array.isArray(arr)) arr.forEach(d => { keys.forEach(k => t += (Number(d[k]) || 0)); });
-        });
-        return t;
+    const sumT = (arr, key) => (arr || []).reduce((a, b) => a + (Number(b[key]) || 0), 0);
+    
+    // Sasaran Bayi Lahir
+    const u17 = sumT(uci.antigen.rv.t1, 'bayi_lhr_hdp_2017_jml');
+    const u22 = sumT(uci.baduta.booster.t2, 'bayi_lhr_hdp_2022_jml');
+    const u23 = sumT(uci.baduta.booster.t3, 'bayi_lhr_hdp_2023_jml');
+    const u24 = sumT(uci.hb0_bcg.t1, 'bayi_lhr_hdp_2024_jml');
+    const u25 = sumT(uci.hb0_bcg.t2, 'bayi_lhr_hdp_2025_jml');
+
+    updateText('uci-2017', u17); updateText('uci-2022', u22); updateText('uci-2023', u23); updateText('uci-2024', u24); updateText('uci-2025', u25);
+
+    const sumS = (obj, keys) => {
+        let total = 0; if (!obj) return 0;
+        Object.values(obj).forEach(arr => { if (Array.isArray(arr)) arr.forEach(d => { keys.forEach(k => total += (Number(d[k]) || 0)); }); });
+        return total;
     };
-
-    const sumT = (antigenObj) => {
-        let t = 0; if (!antigenObj) return 0;
-        Object.values(antigenObj).forEach(arr => {
-            if (Array.isArray(arr)) arr.forEach(d => {
-                t += (Number(d.mati_L) || 0) + (Number(d.mati_P) || 0) + (Number(d.pindah_L) || 0) + (Number(d.pindah_P) || 0) + (Number(d.menolak_L) || 0) + (Number(d.menolak_P) || 0);
-            });
-        });
-        return t;
+    const sumT_Uci = (obj) => {
+        let total = 0; if (!obj) return 0;
+        Object.values(obj).forEach(arr => { if (Array.isArray(arr)) arr.forEach(d => { 
+            total += (Number(d.mati_L)||0) + (Number(d.mati_P)||0) + (Number(d.pindah_L)||0) + (Number(d.menolak_L)||0); 
+        }); });
+        return total;
     };
-
-    const sumPopulasi = (arr, callName) => (arr || []).reduce((a, b) => a + (Number(b[callName]) || 0), 0);
-
-    const u17 = sumPopulasi(uci.antigen.rv.t1, 'bayi_lhr_hdp_2017_jml');
-    const u22 = sumPopulasi(uci.baduta.booster.t2, 'bayi_lhr_hdp_2022_jml');
-    const u23 = sumPopulasi(uci.baduta.booster.t3, 'bayi_lhr_hdp_2023_jml');
-    const u24 = sumPopulasi(uci.hb0_bcg.t1, 'bayi_lhr_hdp_2024_jml');
-    const u25 = sumPopulasi(uci.hb0_bcg.t2, 'bayi_lhr_hdp_2025_jml');
-
-    updateText('uci-2017', u17);
-    updateText('uci-2022', u22);
-    updateText('uci-2023', u23);
-    updateText('uci-2024', u24);
-    updateText('uci-2025', u25);
-
-    const p4 = sumS(uci.baduta.booster, ['pentabio_4_jml']);
-    const mr2 = sumS(uci.baduta.booster, ['mr_2_jml']);
-    const lengkapBoosterRaw = sumS(uci.baduta.booster, ['lengkap_jml']);
-    const lengkapBoosterFiltered = Math.max(0, lengkapBoosterRaw - p4 - mr2);
-
-    const hb0_val = sumS(uci.hb0_bcg, ['hb0_jml']);
-    const bcg_val = sumS(uci.hb0_bcg, ['bcg_jml']);
-    const lengkapHB0Raw = sumS(uci.hb0_bcg, ['lengkap_jml']);
-    const lengkapHB0Filtered = Math.max(0, lengkapHB0Raw - hb0_val - bcg_val);
 
     const hasil = {
-        rv:      { s: sumS(uci.antigen.rv, ['rv_1_jml', 'rv_2_jml', 'rv_3_jml']), t: sumT(uci.antigen.rv) },
-        rotarix: { s: sumS(uci.antigen.rotarix, ['rotarix_1_jml', 'rotarix_2_jml']), t: sumT(uci.antigen.rotarix) },
-        pcv:     { s: sumS(uci.antigen.pcv, ['pcv_1_jml', 'pcv_2_jml', 'pcv_3_jml']), t: sumT(uci.antigen.pcv) },
-        je:      { s: sumS(uci.antigen.je, ['je_1_jml']), t: sumT(uci.antigen.je) },
-        heksa:   { s: sumS(uci.antigen.heksavalen, ['heksavalen_1_jml', 'heksavalen_2_jml', 'heksavalen_3_jml']), t: sumT(uci.antigen.heksavalen) },
-        booster: { s: p4 + mr2 + lengkapBoosterFiltered, t: sumT(uci.baduta.booster) },
-        hb0_bcg: { s: hb0_val + bcg_val + lengkapHB0Filtered, t: sumT(uci.hb0_bcg) },
-        tt:      { s: sumS(uci.tt, ['total']), t: sumT(uci.tt) }
+        rv:      { s: sumS(uci.antigen.rv, ['rv_1_jml','rv_2_jml','rv_3_jml']), t: sumT_Uci(uci.antigen.rv) },
+        rotarix: { s: sumS(uci.antigen.rotarix, ['rotarix_1_jml','rotarix_2_jml']), t: sumT_Uci(uci.antigen.rotarix) },
+        pcv:     { s: sumS(uci.antigen.pcv, ['pcv_1_jml','pcv_2_jml','pcv_3_jml']), t: sumT_Uci(uci.antigen.pcv) },
+        je:      { s: sumS(uci.antigen.je, ['je_1_jml']), t: sumT_Uci(uci.antigen.je) },
+        heksa:   { s: sumS(uci.antigen.heksavalen, ['heksavalen_1_jml','heksavalen_2_jml','heksavalen_3_jml']), t: sumT_Uci(uci.antigen.heksavalen) },
+        booster: { s: sumS(uci.baduta.booster, ['lengkap_jml']), t: sumT_Uci(uci.baduta.booster) },
+        hb0_bcg: { s: sumS(uci.hb0_bcg, ['lengkap_jml']), t: sumT_Uci(uci.hb0_bcg) },
+        tt:      { s: sumS(uci.tt, ['total']), t: sumT_Uci(uci.tt) }
     };
 
     Object.keys(hasil).forEach(k => updateCard(k, hasil[k].s, hasil[k].t));
 
-    return {
-        total_s: Object.values(hasil).reduce((a, b) => a + b.s, 0),
-        total_t: Object.values(hasil).reduce((a, b) => a + b.t, 0),
-        sasaran_uci: u17 + u22 + u23 + u24 + u25
+    return { 
+        total_s: Object.values(hasil).reduce((a,b)=>a+b.s,0), 
+        total_t: Object.values(hasil).reduce((a,b)=>a+b.t,0), 
+        sasaran_uci: u17+u22+u23+u24+u25, 
+        jk: { L: 0, P: 0 } 
     };
 }
 
-// ==================================================
-// 6. SCATTER CHART LOGIC (DENGAN LABEL VERTIKAL)
-// ==================================================
-function updateScatterChart(filterPusk) {
-    const scatterEl = document.getElementById('scatterChart');
-    if (!scatterEl || !cachedData) return;
+/* ==================================================
+   6. CHART GENERATORS (BAR CHART GANDA BIAS & UCI)
+   ================================================== */
+function updateBarChart(filterPusk) {
+    const barEl = document.getElementById('barChart');
+    if (!barEl || !cachedData) return;
 
-    const bias = cachedData.program_imunisasi.bias;
-    const uci = cachedData.program_imunisasi.uci;
+    let labels = [...new Set(cachedData.program_imunisasi.bias.campak.map(d => d.Pukesmas || d.Puskesmas))].filter(Boolean);
+    if (filterPusk !== 'all') labels = labels.filter(p => normalizePuskesmasName(p) === normalizePuskesmasName(filterPusk));
 
-    let allPusk = [...new Set(bias.campak.map(d => d.Pukesmas || d.Puskesmas || d.puskesmas))];
-    if (filterPusk !== 'all') allPusk = allPusk.filter(p => p === filterPusk);
-
-    const scatterData = allPusk.map(namaPusk => {
-        const b_s = bias.campak.filter(d => (d.Pukesmas||d.Puskesmas||d.puskesmas) === namaPusk).reduce((a, b) => a + (Number(b.imun_cmk_jml) || 0), 0) +
-                    bias.dt.filter(d => (d.Pukesmas||d.Puskesmas||d.puskesmas) === namaPusk).reduce((a, b) => a + (Number(b.dt_imun_jml) || 0), 0);
-        
-        const u_s = uci.baduta.booster["2023"].filter(d => (d.Pukesmas||d.Puskesmas||d.puskesmas) === namaPusk).reduce((a, b) => a + (Number(b.lengkap_jml) || 0), 0);
-
-        return { x: b_s, y: u_s, label: namaPusk };
+    const dataBias = labels.map(name => {
+        const norm = normalizePuskesmasName(name);
+        const campak = cachedData.program_imunisasi.bias.campak.filter(d => normalizePuskesmasName(d.Pukesmas||d.Puskesmas) === norm).reduce((a,b)=>a+(Number(b.imun_cmk_jml)||0),0);
+        const dt = cachedData.program_imunisasi.bias.dt.filter(d => normalizePuskesmasName(d.Pukesmas||d.Puskesmas) === norm).reduce((a,b)=>a+(Number(b.dt_imun_jml)||0),0);
+        return campak + dt;
     });
 
-    if (scatterChartInstance) {
-        scatterChartInstance.data.datasets[0].data = scatterData;
-        scatterChartInstance.update();
+    const dataUci = labels.map(name => {
+        const norm = normalizePuskesmasName(name);
+        return cachedData.program_imunisasi.uci.baduta.booster["2023"].filter(d => normalizePuskesmasName(d.Pukesmas||d.Puskesmas) === norm).reduce((a,b)=>a+(Number(b.lengkap_jml)||0),0);
+    });
+
+    if (barChartInstance) {
+        barChartInstance.data.labels = labels;
+        barChartInstance.data.datasets[0].data = dataBias;
+        barChartInstance.data.datasets[1].data = dataUci;
+        barChartInstance.update();
     } else {
-        scatterChartInstance = new Chart(scatterEl, {
-            type: 'scatter',
+        barChartInstance = new Chart(barEl, {
+            type: 'bar',
             data: {
-                datasets: [{
-                    label: 'Puskesmas',
-                    data: scatterData,
-                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
-                    borderColor: 'red',
-                    pointRadius: 8
-                }]
+                labels: labels,
+                datasets: [
+                    { label: 'Capaian BIAS', data: dataBias, backgroundColor: '#0d47a1' },
+                    { label: 'Capaian UCI', data: dataUci, backgroundColor: '#64b5f6' }
+                ]
             },
-            options: {
-                responsive: true,
-                // Tambahkan padding top yang cukup tinggi agar label vertikal tidak terpotong
-                layout: { padding: { top: 80, right: 30 } },
-                plugins: {
-                    title: { display: true, text: 'Perbandingan BIAS vs UCI Per Puskesmas', font: { size: 16 } },
-                    datalabels: {
-                        display: true,
-                        // Penyesuaian Posisi Vertikal
-                        align: 'end',      // Muncul di ujung luar titik
-                        anchor: 'end',     // Jangkar di luar titik
-                        rotation: -90,     // Membuat teks vertikal (90 derajat berlawanan jarum jam)
-                        offset: 10,        // Jarak dari titik ke teks
-                        formatter: function(value) {
-                            return value.label; 
-                        },
-                        font: { weight: 'bold', size: 10 },
-                        color: '#444',
-                        clip: false        // Pastikan tidak terpotong tepi canvas
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => `${ctx.raw.label}: (BIAS: ${ctx.raw.x}, UCI: ${ctx.raw.y})`
-                        }
-                    }
-                },
-                scales: {
-                    x: { title: { display: true, text: 'Total BIAS' }, beginAtZero: true },
-                    y: { title: { display: true, text: 'Total UCI' }, beginAtZero: true }
-                }
-            }
+            options: { responsive: true, plugins: { datalabels: { anchor: 'end', align: 'top', font: { size: 10, weight: 'bold' } } }, scales: { y: { beginAtZero: true } } }
         });
     }
 }
 
-// ==================================================
-// 7. UI HELPERS (TIDAK BERUBAH)
-// ==================================================
-function updateText(id, val) {
-    const el = document.getElementById(id);
-    if (el) el.innerText = (Number(val) || 0).toLocaleString('id-ID');
+function updateScatterChart(filterPusk) {
+    const scatterEl = document.getElementById('scatterChart'); if (!scatterEl) return;
+    let labels = [...new Set(cachedData.program_imunisasi.bias.campak.map(d => d.Pukesmas || d.Puskesmas))];
+    if (filterPusk !== 'all') labels = labels.filter(p => normalizePuskesmasName(p) === normalizePuskesmasName(filterPusk));
+    const data = labels.map(n => ({
+        x: cachedData.program_imunisasi.bias.campak.filter(d=>normalizePuskesmasName(d.Pukesmas||d.Puskesmas)===normalizePuskesmasName(n)).reduce((a,b)=>a+(Number(b.imun_cmk_jml)||0),0),
+        y: cachedData.program_imunisasi.uci.baduta.booster["2023"].filter(d=>normalizePuskesmasName(d.Pukesmas||d.Puskesmas)===normalizePuskesmasName(n)).reduce((a,b)=>a+(Number(b.lengkap_jml)||0),0),
+        label: n
+    }));
+    if (scatterChartInstance) { scatterChartInstance.data.datasets[0].data = data; scatterChartInstance.update(); } 
+    else { scatterChartInstance = new Chart(scatterEl, { type: 'scatter', data: { datasets: [{ label: 'Puskesmas', data: data, backgroundColor: 'red' }] }, options: { layout: { padding: 80 }, plugins: { datalabels: { rotation: -90, align: 'end', anchor: 'end', formatter: (v)=>v.label } } } }); }
 }
 
-function updateCard(prefix, s, t) {
-    updateText(`total-${prefix}-s`, s);
-    updateText(`total-${prefix}-t`, t);
+function updateJKChart(l, p) {
+    const jkEl = document.getElementById('jkChart'); if (!jkEl) return;
+    if (jkChartInstance) { jkChartInstance.data.datasets[0].data = [p, l]; jkChartInstance.update(); } 
+    else { jkChartInstance = new Chart(jkEl, { type: 'doughnut', data: { labels: ['Perempuan', 'Laki-laki'], datasets: [{ data: [p, l], backgroundColor: ['#ec407a', '#42a5f5'] }] } }); }
 }
+
+function updateUsiaChart(resBias) {
+    const usiaEl = document.getElementById('usiaChart'); if (!usiaEl) return;
+    if (usiaChartInstance) { usiaChartInstance.data.datasets[0].data = resBias.detail_sasaran; usiaChartInstance.update(); } 
+    else { usiaChartInstance = new Chart(usiaEl, { type: 'doughnut', data: { labels: ['Kls 1', 'Kls 2', 'Kls 5', 'Kls 6', 'Kls 9'], datasets: [{ data: resBias.detail_sasaran, backgroundColor: ['#42a5f5', '#66bb6a', '#ffa726', '#ab47bc', '#ef5350'] }] } }); }
+}
+
+/* ==================================================
+   7. UI HELPERS & FILTER POPULATION
+   ================================================== */
+function updateText(id, val) { const el = document.getElementById(id); if (el) el.innerText = (id.includes('persen') ? val : (Number(val) || 0).toLocaleString('id-ID')); }
+function updateCard(prefix, s, t) { updateText(`total-${prefix}-s`, s); updateText(`total-${prefix}-t`, t); }
 
 function populatePuskesmasFilter() {
-    const selector = document.getElementById('puskesmasSelector');
-    if (!selector || !cachedData) return;
-    const puskSet = new Set();
-    const bias = cachedData.program_imunisasi.bias;
-    if (Array.isArray(bias.campak)) {
-        bias.campak.forEach(d => puskSet.add(d.Pukesmas || d.Puskesmas || d.puskesmas));
-    }
+    const selector = document.getElementById('puskesmasSelector'); if (!selector) return;
+    const puskSet = new Set(); 
+    cachedData.program_imunisasi.bias.campak.forEach(d => puskSet.add(d.Pukesmas || d.Puskesmas));
     [...puskSet].filter(Boolean).sort().forEach(p => selector.add(new Option(p, p)));
 }
 
 document.addEventListener('DOMContentLoaded', fetchImunisasiData);
-
-    /* ================= DISTRIBUSI USIA ================= */
-    const usiaEl = document.getElementById('usiaChart');
-    if (usiaEl) {
-        new Chart(usiaEl, {
-            type: 'doughnut',
-            data: {
-                labels: ['0-14', '15-24', '25-44', '45-64', '65+'],
-                datasets: [{
-                    data: [27, 21, 17, 18, 17],
-                    backgroundColor: [
-                        '#42a5f5',
-                        '#66bb6a',
-                        '#ffa726',
-                        '#ab47bc',
-                        '#ef5350'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true
-            }
-        });
-    }
-
-    /* ================= JENIS KELAMIN ================= */
-    const jkEl = document.getElementById('jkChart');
-    if (jkEl) {
-        new Chart(jkEl, {
-            type: 'doughnut',
-            data: {
-                labels: ['Perempuan', 'Laki-laki'],
-                datasets: [{
-                    data: [57.8, 42.2],
-                    backgroundColor: ['#ec407a', '#42a5f5']
-                }]
-            },
-            options: {
-                responsive: true
-            }
-        });
-    }
-
-    /* ================= BAR PUSKESMAS ================= */
-    const barEl = document.getElementById('barChart');
-    if (barEl) {
-        new Chart(barEl, {
-            type: 'bar',
-            data: {
-                labels: ['Cangkringan', 'Berbah', 'Mlati', 'Gamping', 'Tempel'],
-                datasets: [{
-                    label: 'Jumlah Kasus',
-                    data: [138, 174, 500, 239, 211],
-                    backgroundColor: '#64b5f6'
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-    }
 
     /* ================= TREND KERACUNAN ================= */
     const trendEl = document.getElementById('trendChart');
@@ -451,3 +368,21 @@ document.addEventListener('DOMContentLoaded', fetchImunisasiData);
             }
         });
     }
+
+/* ================= PAGE NAVIGATION ================= */
+function changePage(pageId, el) {
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.remove('active');
+    });
+
+    const target = document.getElementById(pageId);
+    if (target) {
+        target.classList.add('active');
+    }
+
+    document.querySelectorAll('.sidebar li').forEach(li => {
+        li.classList.remove('active');
+    });
+
+    if (el) el.classList.add('active');
+}
