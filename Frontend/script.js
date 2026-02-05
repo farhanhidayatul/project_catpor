@@ -15,7 +15,9 @@ let logistikCampakInstance = null;
 let logistikDtInstance = null;
 let logistikTdInstance = null;
 let logistikHpvInstance = null;
-
+let ipVaksinChartInstance = null;
+let uciGenderChartInstance = null;
+let uciStatusCategoryInstance = null;
 
 if (typeof ChartDataLabels !== 'undefined') {
     Chart.register(ChartDataLabels);
@@ -137,6 +139,9 @@ function handleFilterChange() {
     updateLogistikDtChart(filteredBias);
     updateLogistikTdChart(filteredBias);
     updateLogistikHpvChart(filteredBias);
+    updateIpVaksinChart(filteredBias);
+    updateUciGenderChart(filteredUci)
+    updateUciStatusCategoryChart(filteredUci)
     
 }
 
@@ -1006,6 +1011,277 @@ function updateLogistikHpvChart(filteredBias) {
 }
 
 /* ==================================================
+   FUNGSI: UPDATE GRAFIK I.P VAKSIN (PIE CHART)
+   ================================================== */
+
+function updateIpVaksinChart(filteredBias) {
+    const canvas = document.getElementById('logisticI.PVaksinChart'); // Menggunakan ID sesuai template Anda
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // 1. Helper untuk menjumlahkan data
+    const sumData = (targetArray, key) => {
+        if (!targetArray || targetArray.length === 0) return 0;
+        return targetArray.reduce((total, d) => total + (Number(d[key]) || 0), 0);
+    };
+
+    // 2. Kalkulasi Total Vaksin per Kategori
+    // Pastikan nama key 'vksn_digunakan' sesuai dengan nama kolom di JSON Anda
+    const totalCampak = sumData(filteredBias.campak, 'i_p_vksn_cmk');
+    const totalDt     = sumData(filteredBias.dt,     'i_p_vksn_dt');
+    const totalTd     = sumData(filteredBias.td,     'i_p_vksn_td');
+    
+    const dataHpvRaw  = [
+        ...(filteredBias.hpv?.kelas?.kelas_5 || []),
+        ...(filteredBias.hpv?.kelas?.kelas_6 || []),
+        ...(filteredBias.hpv?.kelas?.kelas_9 || [])
+    ];
+    const totalHpv    = sumData(dataHpvRaw,          'i_p_vksn_hpv');
+
+    const ipData = [totalCampak, totalDt, totalTd, totalHpv];
+
+    // 3. Render atau Update Pie Chart
+    if (ipVaksinChartInstance) {
+        ipVaksinChartInstance.data.datasets[0].data = ipData;
+        ipVaksinChartInstance.update();
+    } else {
+        ipVaksinChartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Campak', 'DT', 'TD', 'HPV'],
+                datasets: [{
+                    data: ipData,
+                    backgroundColor: [
+                        '#FF7043', // Oranye (Campak)
+                        '#42A5F5', // Biru (DT)
+                        '#66BB6A', // Hijau (TD)
+                        '#AB47BC'  // Ungu (HPV)
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, padding: 20 }
+                    },
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold', size: 12 },
+                        formatter: (value, ctx) => {
+                            // Menghitung persentase otomatis
+                            let sum = 0;
+                            let dataArr = ctx.chart.data.datasets[0].data;
+                            dataArr.map(data => { sum += data; });
+                            let percentage = (value * 100 / sum).toFixed(1) + "%";
+                            return value > 0 ? percentage : ''; 
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                let value = context.parsed || 0;
+                                return `${label}: ${value} Dosis`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function updateUciGenderChart(filteredUci) {
+    const canvas = document.getElementById('uciGenderChart'); 
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // --- LANGKAH PENTING: MENGGABUNGKAN SEMUA DATA ---
+    // Kita ambil semua array dari berbagai level nested object
+    const allUciData = [
+        // Dari Antigen
+        ...(filteredUci.antigen?.rv?.t1 || []), ...(filteredUci.antigen?.rv?.t2 || []),
+        ...(filteredUci.antigen?.rotarix?.t1 || []), ...(filteredUci.antigen?.rotarix?.t2 || []),
+        ...(filteredUci.antigen?.pcv?.t1 || []), ...(filteredUci.antigen?.pcv?.t2 || []),
+        ...(filteredUci.antigen?.je?.t1 || []), ...(filteredUci.antigen?.je?.t2 || []),
+        ...(filteredUci.antigen?.heksavalen?.t1 || []), ...(filteredUci.antigen?.heksavalen?.t2 || []),
+        
+        // Dari Baduta
+        ...(filteredUci.baduta?.booster?.t1 || []), 
+        ...(filteredUci.baduta?.booster?.t2 || []), 
+        ...(filteredUci.baduta?.booster?.t3 || []),
+        
+        // Dari HB0_BCG dan TT
+        ...(filteredUci.hb0_bcg?.t1 || []), ...(filteredUci.hb0_bcg?.t2 || []),
+        ...(filteredUci.tt?.t1 || []), ...(filteredUci.tt?.t2 || [])
+    ];
+
+    const sumUciMultiKey = (targetArray, keys) => {
+        return targetArray.reduce((total, d) => {
+            let subTotal = 0;
+            keys.forEach(key => {
+                subTotal += (Number(d[key]) || 0);
+            });
+            return total + subTotal;
+        }, 0);
+    };
+
+    // --- PEMETAAN DATA LAKI-LAKI (Menggunakan allUciData) ---
+    const dataLaki = [
+        sumUciMultiKey(allUciData, ['pdtng_+_L', 'pendatang_L']), 
+        sumUciMultiKey(allUciData, ['mati_-_L', 'mati_-']), 
+        sumUciMultiKey(allUciData, ['pindah_-_L', 'bumil_pindah_-']), 
+        sumUciMultiKey(allUciData, ['menolak_-_L', 'menolak_L'])
+    ];
+
+    // --- PEMETAAN DATA PEREMPUAN (Menggunakan allUciData) ---
+    const dataPerempuan = [
+        sumUciMultiKey(allUciData, ['pdtng_+_P', 'pendatang_+']), 
+        sumUciMultiKey(allUciData, ['mati_-_P', 'bumil_mati_-']), 
+        sumUciMultiKey(allUciData, ['pindah_-_P', 'pindah_-']), 
+        // Perbaikan typo pada array keys Anda sebelumnya
+        sumUciMultiKey(allUciData, ['menolak_-_P', 'menolak_p', 'menolak_P', 'bumil_menolak'])
+    ];
+
+    // --- RENDER CHART (Logic tetap sama) ---
+    if (uciGenderChartInstance) {
+        uciGenderChartInstance.data.datasets[0].data = dataLaki;
+        uciGenderChartInstance.data.datasets[1].data = dataPerempuan;
+        uciGenderChartInstance.update();
+    } else {
+        uciGenderChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Pendatang', 'Mati', 'Pindah', 'Menolak'],
+                datasets: [
+                    {
+                        label: 'Laki-laki',
+                        data: dataLaki,
+                        backgroundColor: '#B2FF59', 
+                        borderColor: '#7CB342',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Perempuan',
+                        data: dataPerempuan,
+                        backgroundColor: '#F48FB1', 
+                        borderColor: '#D81B60',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: (val) => val > 0 ? val : '',
+                        font: { weight: 'bold' }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+}
+
+/* ==================================================
+   FUNGSI: UPDATE GRAFIK STATUS UCI BERDASARKAN KATEGORI
+   ================================================== */
+
+function updateUciStatusCategoryChart(filteredUci) {
+    const canvas = document.getElementById('uciStatusCategoryChart'); 
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // 1. Helper: Menggabungkan semua sub-array dalam satu kategori (misal: rv t1 + rv t2 + pcv t1...)
+    const getFlattenedData = (categoryObj) => {
+        if (!categoryObj) return [];
+        // Mengambil semua array t1, t2, dst dari setiap sub-antigen
+        return Object.values(categoryObj).flatMap(sub => Object.values(sub).flat());
+    };
+
+    const sumUciMultiKey = (targetArray, keys) => {
+        return targetArray.reduce((total, d) => {
+            let subTotal = 0;
+            keys.forEach(key => { subTotal += (Number(d[key]) || 0); });
+            return total + subTotal;
+        }, 0);
+    };
+
+    // 2. Persiapkan Data per Kategori untuk sumbu X (Pendatang, Mati, Pindah, Menolak)
+    const categories = [
+        { label: 'Antigen', data: getFlattenedData(filteredUci.antigen), color: '#42A5F5' },
+        { label: 'Baduta', data: getFlattenedData(filteredUci.baduta), color: '#66BB6A' },
+        { label: 'HB0 & BCG', data: filteredUci.hb0_bcg ? Object.values(filteredUci.hb0_bcg).flat() : [], color: '#FFA726' },
+        { label: 'TT (Bumil)', data: filteredUci.tt ? Object.values(filteredUci.tt).flat() : [], color: '#AB47BC' }
+    ];
+
+    // Daftar Key untuk tiap kolom Sumbu X (Gabungan L dan P)
+    const statusKeys = {
+        pendatang: ['pdtng_+_L', 'pdtng_+_P', 'pendatang_L', 'pendatang_P', 'pendatang_+'],
+        mati: ['mati_-_L', 'mati_-_P', 'mati_-', 'bumil_mati_-'],
+        pindah: ['pindah_-_L', 'pindah_-_P', 'pindah_-', 'bumil_pindah_-'],
+        menolak: ['menolak_-_L', 'menolak_-_P', 'menolak_L', 'menolak_P', 'menolak_p', 'bumil_menolak']
+    };
+
+    // 3. Bangun Dataset untuk Chart.js
+    const datasets = categories.map(cat => {
+        return {
+            label: cat.label,
+            backgroundColor: cat.color,
+            data: [
+                sumUciMultiKey(cat.data, statusKeys.pendatang),
+                sumUciMultiKey(cat.data, statusKeys.mati),
+                sumUciMultiKey(cat.data, statusKeys.pindah),
+                sumUciMultiKey(cat.data, statusKeys.menolak)
+            ],
+            borderWidth: 1
+        };
+    });
+
+    // 4. Render atau Update Chart
+    if (uciStatusCategoryInstance) {
+        uciStatusCategoryInstance.data.datasets = datasets;
+        uciStatusCategoryInstance.update();
+    } else {
+        uciStatusCategoryInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Pendatang', 'Mati', 'Pindah', 'Menolak'], // Sumbu X Tetap
+                datasets: datasets // Dataset berubah menjadi Kategori UCI
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    datalabels: {
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: (val) => val > 0 ? val : '',
+                        font: { weight: 'bold', size: 10 }
+                    }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+}
+
+/* ==================================================
    7. UI HELPERS & FILTER POPULATION
    ================================================== */
 function updateText(id, val) { const el = document.getElementById(id); if (el) el.innerText = (id.includes('persen') ? val : (Number(val) || 0).toLocaleString('id-ID')); }
@@ -1022,35 +1298,6 @@ function populatePuskesmasFilter() {
 
 document.addEventListener('DOMContentLoaded', fetchImunisasiData);
 
-    // /* ================= DISTRIBUSI PUSKESMAS PAGE ================= */
-    // const faktor = document.getElementById('envFaktorRisikoChart');
-    // if (faktor) {
-    //     new Chart(faktor, {
-    //         type: 'bar',
-    //         data: {
-    //             labels: ['APD', 'Air', 'Higiene'],
-    //             datasets: [{
-    //                 label: 'Jumlah',
-    //                 data: [120, 80, 60],
-    //                 backgroundColor: '#90caf9'
-    //             }]
-    //         }
-    //     });
-    // }
-
-    const pelatihan = document.getElementById('envPelatihanChart');
-    if (pelatihan) {
-        new Chart(pelatihan, {
-            type: 'pie',
-            data: {
-                labels: ['Sudah', 'Belum'],
-                datasets: [{
-                    data: [70, 30],
-                    backgroundColor: ['#66bb6a', '#ef5350']
-                }]
-            }
-        });
-    }
 
     const spesimen = document.getElementById('envSpesimenChart');
     if (spesimen) {
@@ -1109,69 +1356,3 @@ function changePage(pageId, el) {
 
     if (el) el.classList.add('active');
 }
-
-    // const ctx = document.getElementById('myChart').getContext('2d');
-
-// Registrasi plugin agar angka tampil di dalam bar
-// Chart.register(ChartDataLabels);
-
-// const ctx = document.getElementById('pemeriksaanChart').getContext('2d');
-
-// const labels = [
-//     'Escherichia coli', 'coliform', 'Staphylococcus sp', 
-//     'Salmonella sp', 'Baccilus cereus', 'Histamin', 
-//     'Nitrat/Nitrit', 'Vibrio Cholera', 'Shigella', 
-//     'Pseudomonas sp', 'Clostridium Pefringens'
-// ];
-
-// const data = {
-//     labels: labels,
-//     datasets: [
-//         {
-//             label: 'tidak diperiksa',
-//             data: [7, 8, 12, 10, 12, 24, 21, 24, 22, 22, 20],
-//             backgroundColor: '#A9A9A9',
-//         },
-//         {
-//             label: 'negatif',
-//             data: [6, 7, 7, 10, 8, 2, 4, 2, 4, 4, 4],
-//             backgroundColor: '#81D4FA',
-//         },
-//         {
-//             label: 'positif',
-//             data: [14, 11, 7, 6, 6, 0, 1, 0, 0, 0, 1],
-//             backgroundColor: '#B71C1C',
-//         }
-//     ]
-// };
-
-// const config = {
-//     type: 'bar',
-//     data: data, // Gunakan variabel data Anda sebelumnya
-//     options: {
-//         indexAxis: 'y', 
-//         responsive: true,
-//         /* WAJIB FALSE: Jika TRUE, chart akan mengabaikan tinggi 800px 
-//            dan kembali menjadi gepeng */
-//         maintainAspectRatio: false, 
-//         devicePixelRatio: 2, 
-//         plugins: {
-//             legend: { position: 'top' },
-//             title: { display: false } // Judul sudah ada di <h4> HTML
-//         },
-//         scales: {
-//             x: { stacked: true },
-//             y: { 
-//                 stacked: true,
-//                 ticks: {
-//                     autoSkip: false, // Tampilkan semua nama bakteri
-//                     font: { size: 12 }
-//                 }
-//             }
-//         }
-//     }
-// };
-
-// // Inisialisasi Chart
-// new Chart(ctx, config);
-
